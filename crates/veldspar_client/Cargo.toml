@@ -1,0 +1,23 @@
+[package]
+name = "veldspar_client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+veldspar_core = { path = "../veldspar_core" }
+veldspar_shared = { path = "../veldspar_shared" }
+veldspar_persist = { path = "../veldspar_persist" }
+wgpu = { workspace = true }
+winit = { workspace = true }
+glam = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+pollster = { workspace = true }
+bytemuck = { workspace = true }
+image = { workspace = true }
+rayon = { workspace = true }
+noise = { workspace = true }
+renet = { workspace = true }
+bincode = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }

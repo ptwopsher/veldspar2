@@ -1,0 +1,16 @@
+[package]
+name = "veldspar_server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+veldspar_core = { path = "../veldspar_core" }
+veldspar_shared = { path = "../veldspar_shared" }
+veldspar_persist = { path = "../veldspar_persist" }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+renet = { workspace = true }
+bincode = { workspace = true }
+rayon = { workspace = true }
+glam = { workspace = true }
+ctrlc = "3"

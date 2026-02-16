@@ -1,0 +1,1784 @@
+Excalibur Changelog
+══════════════════════════════════════════════	
+January 19, 2026
+V[1.21.11]
+
+FORMATTING
+- added Excalibur backwards compatibility (Thanks GrandPappyJay!)
+
+FIXES
+- fixed sun/moon
+- fixed missing door close sound
+- fixed missing chest close sound
+- fixed oak fence gate UV
+- fixed dark oak fence gate z-fighting (Thanks Ansen!)
+- fixed mossy stone brick wall z-fighting (Thanks Ansen!)
+- fixed shelf UV (Thanks Saylem!)
+- fixed villager GUI allignment (Thanks GrandPappyJay!)
+- fixed white cow variant snout (Thanks GrandPappyJay!)
+- removed old unused models (Thanks VacAge!)
+- removed redundant cherry fence gate wall model (now acquired through the blockstate)
+- removed redundant dark oak fence gate wall model (now acquired through the blockstate)
+- removed redundant jungle fence gate wall model (now acquired through the blockstate)
+- removed redundant pale oak fence gate wall model (now acquired through the blockstate)
+
+BLOCKS
+- added "locked" hopper model + texture
+- added bed model
+- added carpet model + carpet textures
+- added granite variants
+- added mossy cobblestone wall blockstate
+- added polished andesite variants
+- added soul brazier (soul campfire signal flame)
+- updated calibrated sculk sensor (palantir) + added custom sounds
+- updated dirt path + added variant
+- updated pumpkin/melon growth stages
+- updated stripped dark oak log top
+- updated water flow
+- adjusted calcite color palette
+- adjusted smooth stone slab
+- tweaked barrel
+
+ITEMS
+- added lunge enchanted book
+- added nautilus armor
+- added nautilus spawn egg
+- added netherite horse armor
+- added spears
+- added zombie nautilus spawn egg
+
+ENTITIES
+- added baby nautilus
+- added camel husk
+- added nautilus
+- added nautilus armor (inspired by RBst)
+- added netherite horse armor
+- added parched
+- added pixel-accurate wearable jack o' lantern
+- added zombie coral nautilus
+- added zombie nautilus
+- updated bamboo raft chest
+- updated skeletons
+- updated wither
+- adjusted husk
+
+MISC
+- added Rubedo by Lena Raine to main menu music
+- added Subwoofer Lullaby by C418 to main menu music
+- updated anvil block sounds
+- updated some effect icons
+- updated recipe toast UI
+
+MODDED
+- added Axiom GUI texture support
+- added screaming goat variants
+- updated polished granite ctm properties
+- tweaked water color
+
+
+October 13, 2025
+V[1.21.10]
+
+BUGS
+- fixed dark oak fence/gate z-fighting (Thanks Illyrius!)
+- fixed flipped wood chest inner texture
+- fixed gap in armor leggings (Thanks Liski and GrandPappyJay!)
+- fixed gap in widget tab GUI (Thanks Liski and GrandPappyJay!)
+- fixed missing stone brick wall texture & updated corners (Thanks Ansen!)
+- fixed redundant slot in horse GUI
+
+BLOCKS
+- added copper bars
+- added copper chains
+- added copper chests
+- added copper lantern
+- added copper torch
+- added crimson fence gate texture
+- added mangrove fence/fence gate texture
+- added moss block rotational variants
+- added packed mud rotational variants
+- added shelves
+- added subtle undergrowth texture to grass blocks
+- added terracotta rotational variants
+- added warped fence gate texture
+- updated andesite + added variants
+- updated block breaking animation
+- updated blue ice
+- updated copper blocks
+- updated cyan concrete
+- updated dark oak planks + added variants
+- updated ice
+- updated iron chain + lantern chain
+- updated lightning rod + oxidation + powered variants
+- updated lilypad lotus flower model
+- updated lime concrete
+- updated oak + pale oak log variation format (Thanks GrandPappyJay!)
+- updated packed ice + added variants
+- updated pale oak leaves
+- updated polished andesite
+- updated stone variants
+- updated stripped oak wood
+- optimized dark oak fence models (Thanks GrandPappyJay!)
+- adjusted spruce trapdoor blockstate for more flush floor placement
+- tweaked cyan terracotta color palette
+
+MISC
+- added Lilypad by Amos Roddy to main menu music
+- added O's Piano by Amos Roddy to main menu music
+- added locator bar textures
+- added misc GUI sprites
+- added missing_texture texture
+- updated font (font is now closer to the Excalibur title font, Timeless Bold)
+
+ITEMS
+- tweaked copper ingot color
+- added copper armor
+- added copper golem spawn egg
+- added copper horse armor
+- added copper nugget
+- added copper tools + custom oxidized variants
+- added subtle animation to firefly bush
+
+ENTITIES
+- added copper armor
+- added copper horse armor
+- added copper golem
+- adjusted wandering trader
+
+CUSTOM ITEMS
+- updated custom netherite item color palettes
+- improved shield models for CIT (Thanks GrandPappyJay!)
+- added "Illager Axe" iron axe rename
+- updated wizard hat
+- added "Black Wizard Hat" carved pumpkin rename
+- added "Brick Jar" carved pumpkin rename
+- added "Brown Wizard Hat" carved pumpkin rename
+- added "Chef Hat" carved pumpkin rename
+- added "Mushroom Cap" carved pumpkin rename
+
+MODDED
+- fixed baby zombie model positioning
+- updated various overlay connections
+- added biome-specific swamp firefly bush
+- added icicles (biome-specific pointed dripstone)
+- added wandering deer (wandering llama)
+
+August 18, 2025
+V[1.21.8]
+
+BUGS
+- swapped eye and dune trim item textures
+- renamed skybox legend.properties to legend.txt (Thanks Liski and GrandPappyJay!)
+
+BLOCKS
+- added glow lichen variant
+- added netherrack variant
+- added podzol random rotation
+- added oak sapling second stage
+- added spruce sapling second stage
+- updated lilypads with denser variation and subtle color differences
+
+
+ITEMS
+- added dennis painting
+- added lava chicken music disc
+
+
+CUSTOM ITEMS
+- updated custom named items to vanilla format (Thanks GrandPappyJay!)
+- removed carved pumpkin blur for custom carved pumpkin hat visibility
+- added "Hood" carved pumpkin rename
+- added "Straw Hat" carved pumpkin rename
+- added "Wizard Hat" carved pumpkin rename
+- added "Red Headband" carved pumpkin rename
+
+
+June 17, 2025
+V[1.21.6]
+
+BUGS
+- fixed enchanted armor glint
+- fixed moss carpet transparency and optimized model
+- fixed empty bee nest model
+- fixed various missing reference warnings
+- removed peaking pixel on sheep undercoat texture
+- added missing pixels on chicken UV
+
+MODDED
+- fixed light blue color properties
+- fixed slime model (Thanks GrandPappyJay!) & added subtle animation
+- fixed temperate pig wrong texture call
+- added sheep undercoat model
+- added subtle crop biome tint color properties
+- added suspicious sand & clay to sand color properties
+- split adult and baby equine models
+- updated appleskin icons
+- updated fabric creative buttons
+
+BLOCKS
+- added copper pipes (cut copper doubleslab)
+- added dried ghast gravestones
+- added dry grass
+- added extra glow lichen blockstate models (Thanks GrandPappyJay!)
+- added hanging flower pots
+- added hanging sculk model
+- added hot cauldron model
+- added pale moss carpet model
+- added potted torchflower emissive model
+- adjusted cherry leaves
+- adjusted pale oak trapdoor
+- updated birch fence inventory model
+- updated brown candle
+- updated leaf litter colormap
+
+ITEMS
+- added tears music disc
+- added happy ghast spawn egg
+- added ghast harness
+
+ENTITIES
+- updated ghast texture and added custom model
+- added ghast harness
+- added happy ghast
+- added baby ghast
+
+OPTIMIZATION
+- updated anvil cullfacing
+- updated bamboo stalk model
+- updated barrel cullfacing 
+- updated bee nest cullfacing
+- updated bookshelf cullfacing 
+- updated button cullfacing 
+- updated cake cullfacing
+- updated campfire cullfacing
+- updated cartography table cullfacing 
+- updated cauldron cullfacing
+- updated crop models
+- updated doors cullfacing
+- updated dripstone cullfacing 
+- updated enchanting table cullfacing
+- updated fence/gate cullfacing 
+- updated glow lichen cullfacing 
+- updated hopper cullfacing 
+- updated iron bars cullfacing
+- updated ladder cullfacing 
+- updated lantern cullfacing 
+- updated leaf litter cullfacing 
+- updated leaf cullfacing
+- updated lever cullfacing 
+- updated lightning rod cullfacing
+- updated mushroom cullfacing
+- updated rail cullfacing 
+- updated sculk vein cullfacing 
+- updated smoker cullfacing 
+- updated TNT cullfacing
+- updated torch cullfacing 
+- updated trapdoor cullfacing 
+- updated tripwire cullfacing 
+- updated vine cullfacing 
+
+
+April 13, 2025
+V[1.21.5_01]
+
+ITEMS
+- added missing suspicious stew fallback model
+- added unique axolotl buckets
+- flipped beetroot & golden carrot eating animation (Thanks GrandPappyJay!)
+
+BLOCKS
+- added brown mushroom variant
+- added red mushroom variant
+- added pale oak doubleslab + CTM
+
+ENTITIES
+- fixed axolotl z-fighting (Thanks GrandPappyJay!)
+- fixed floating mooshroom mushrooms
+
+TEXTS
+- updated advancement title font colors for visibility
+- added entity UI text for boats, minecarts, donkeys, and llamas
+- added missing font color for villager titles
+- added new splashes
+
+MODDED
+- fixed an issue where baby chickens feet were not visible when standing still
+- fixed dwarf villager head model (Thanks GrandPappyJay!)
+- added boat models
+- added cold chicken model w/ variant
+- added cold cow model
+- added cold pig model
+- added connected creaking heart textures for birch, dark oak, oak, and spruce logs (awaiting Continuity/Optifine 1.21.5 update)
+- added duck model (Thanks GrandPappyJay!)
+- added missing wither skeleton skull model
+- added warm chicken model
+- added warm cow model w/ variant
+- added warm pig model w/ variant
+- updated mooshroom model
+- updated temperate chicken model
+- updated temperate cow model
+- updated temperate pig model
+
+- added appleskin mod support
+- added ETF UI support
+- added fabric UI support
+- added iris UI support
+- added jade UI support
+- added modmenu UI support
+- added subtle effects mod support
+
+
+April 1, 2025
+V[1.21.5]
+
+BUGFIXES
+- fixed an issue where shields used 0,0,0 black pixels
+- fixed an issue where the spruce doubleslab called the wrong model
+- fixed an issue where there was a hard edge in the custom skybox
+- fixed mooshroom texture mapping
+- fixed z-fighting on sandstone/mossy/regular stone brick walls
+- added missing creaking heart textures
+- added missing map icons
+- added missing shield banners
+- added missing sniffer CEM
+- added missing waxed copper block UI text
+
+BLOCKS
+- added bush w/ variants
+- added cactus flower w/ custom model
+- added firefly bush
+- added leaf litter
+- added sweet berry pie cake variant
+- added wildflowers
+- adjusted ancient debris
+- updated cake textures and models
+
+ITEMS
+- added blue egg
+- added brown egg
+- added spawn eggs
+- adjusted golden carrot leafs
+- tweaked bowls
+- tweaked cooked cod
+- tweaked cooked salmon
+- updated netherite tool set
+- updated netherite upgrade
+
+VANILLA CUSTOM ITEM TEXTURES
+- added enchanted books
+- added firework rockets
+- added food eating animations
+- added infinity enchanted bow
+- added paintings
+- added suspicious stews
+
+ENTITIES
+- added cold pig
+- added cold chicken
+- added warm pig
+- added warm cow
+- added warm chicken
+- added sheep undercoat
+
+EQUIPMENT
+- moved saddles to equipment folder
+- added wearable carved pumpkin
+- updated carved pumpkin blur UI
+- updated copper trim to exposed copper color palette
+- updated diamond on diamond trim color palette
+- updated gold on gold trim color palette
+- updated iron trim color palettes
+- updated netherite armor color palette
+- updated netherite trim color palettes
+- updated redstone trim color palette
+
+STATUS EFFECTS
+- added absorption
+- added fire resistance
+- added health boost
+- added instant damage
+- added instant health
+- added invisibility
+- added jump boost
+- added levitation
+- added nausea
+- added regeneration
+- added resistance
+
+MODDED
+- added emissive chorus flower
+- added grass side overlay
+- added water drop particle color
+
+February 10, 2025
+V[1.21.4]
+
+BUGFIXES
+- moved equipment textures to new folder structure
+- fixed an issue where dark oak boats used an outdated color palette
+- fixed an issue where rabbits used 0,0,0 pixels
+
+BLOCKS
+- adjusted fern saturation by 50%
+- tweaked terracotta color
+- updated dark oak door
+- updated dark oak trapdoor
+- updated cartography table top
+- updated oak log variants to vanilla blockstates
+- updated poppy model
+- updated torchflower to vanilla emissive
+- added chiseled resin bricks
+- added creaking heart
+- added eyeblossom
+- added new paintings (some paintings are WIP or placeholders)
+- added pale hanging moss
+- added pale moss block w/ variant
+- added pale oak door
+- added pale oak fence w/ custom model
+- added pale oak log w/ variants
+- added pale oak planks w/ variants
+- added pale oak pressure plate & button
+- added pale oak sapling
+- added pale oak trapdoor
+- added polished granite top texture
+- added resin block
+- added resin bricks
+- added stripped pale oak log
+
+ITEMS
+- added bordure indented banner pattern
+- added bundles
+- added field masoned banner pattern
+- added pale oak boat
+- added pale oak door
+- added pale oak hanging sign
+- added pale oak sign
+- added resin brick
+- added resin clump
+
+ENTITIES
+- added creaking
+- added unique piglin sword 
+- added unique wither skeleton sword 
+- updated magma cube UV mapping
+- updated wither color palette
+- updated wither skeleton color palette
+
+USER INTERFACE
+- added bundle textures
+- added empty air breathing bubble texture
+- added empty slot textures
+- added tooltip textures
+
+MISC
+- added pale oak leaf particles
+- added resin trim color palette
+- updated extras.txt
+
+MODDED
+- fixed baby chicken model
+- fixed baby zombie model
+- fixed horse model
+- fixed netherrack overlay on ore blocks
+- fixed sweeping edge enchanted book enchantmentID
+- removed redstone.png colormap for Polytone compatibility
+- added breach enchanted book
+- added deepslate overlay
+- added density enchanted book
+- added diamond mastersword CIT
+- added dirt slab variants (petrified_oak_slab:type=bottom)
+- added wind burst enchanted book
+- added biome-specific blue orchids
+- added biome-specific pale creepers
+- added biome-specific pale oak campfire
+- added biome-specific pale pumpkins
+- added biome-specific pale zombies
+
+GRANDPAPPYJAY'S ENTITY OVERHAUL PREVIEW
+- fixed double chest custom model rendering
+- added villager variants (bedrock skintones and dwarves)
+- added wither skeleton scabbard
+
+KNOWN ISSUES
+- modded custom item textures (suspicious stew, firework rocket, paintings)
+- moss carpet transparency
+- pale moss carpet growth vanilla texture
+
+
+September 10, 2024
+V[1.21.1]
+
+BLOCKS
+- added chiseled copper
+- added chiseled tuff
+- added chiseled tuff bricks
+- added copper bulb
+- added copper door
+- added copper grate
+- added copper trapdoor
+- added crafter
+- added flow decorated pot
+- added heavy core
+- added guster decorated pot
+- added ominous vault
+- added polished tuff
+- added scrape decorated pot
+- added trial spawner
+- added tuff bricks
+- added vault
+
+ITEMS
+- added breeze rod
+- added bolt smithing template
+- added creator music discs
+- added flow banner pattern
+- added flow smithing template
+- added guster banner pattern
+- added mace
+- added ominous bottle
+- added ominous trial key
+- added precipice music disc
+- added trial key
+
+ENTITIES
+- added bogged
+- added breeze
+
+MISC
+- added bundle UI
+- added featherfall to main menu music
+- added watcher to main menu music
+- added komorebi to main menu music
+
+
+June 2, 2024
+V[1.20.6]
+
+- updated resource pack format
+- updated title logo
+- fixed turtle scute
+
+- added armadillo
+- added dirt variants
+- added wolf variants
+
+
+March 15, 2024
+V[1.20.4]
+
+	Bug Fixes
+- fixed main menu music
+- fixed short grass blockstate
+- fixed recipe book UI search bar
+- fixed bamboo fence gate UV mapping
+- fixed dripleaf model scaling
+- fixed stonebrick wall z-fighting
+- fixed enchanting and lectern book overlap
+- fixed .properties files for blaze and salmon
+- fixed .properties files for better side grass
+- fixed birch, cherry, and spruce top slabs (Thanks GrandPappyJay!)
+- fixed shadow .mcmeta (Thanks GrandPappyJay!)
+- fixed ETF/EMF chest compatibility (Thanks GrandPappyJay!)
+
+	Entities
+- finished ravager
+- finished warden
+- added ender dragon
+- added bat
+- added axolotls
+- added tropical fish
+- added cats
+- added frogs
+- added tadpole
+- added pandas
+- added conduit
+- added goat
+- added camel
+- added desert villagers
+- added savanna villagers
+- added taiga villagers
+- added jungle villagers
+- added swamp villagers
+- added evoker fangs
+
+	Blocks
+- added cherry sapling
+- added copper bulb
+- added block of raw copper
+- added block of raw iron
+- added lime glazed terracotta
+- added bamboo button
+- added amethyst clusters
+- added structure blocks
+- added froglights
+- added calcite
+- added sculk
+- added sculk vein
+- added sculk catalyst
+- added sculk sensor
+- added sculk calibrated sensor
+- added sculk shrieker
+- added small dripleaf
+- added big dripleaf
+- added spore blossom
+- added brain corals
+- added horn corals
+- added fire corals
+- added tube corals
+- updated bubble corals
+- updated iron door
+- updated oxidized copper colors
+- updated bamboo colors
+- updated bamboo mosaic to bamboo thatch
+
+	Items
+- added nether star
+- added goat horn
+- added echo shard
+- added pointed dripstone
+- added pitcher pod
+- added recovery compass
+- added firework star
+- tweaked compass
+
+	User Interface
+- spliced UI
+- added map
+- added crafter
+- added saturation effect icon
+- added poison effect icon
+- updated stonecutter
+- updated cartography table
+
+
+	Optifine
+- adjusted lilypad color
+- added hide armor (leather)(Hide Helmet, Hide Chestplate, Hide Leggings, Hide Boots)
+- added goat variants
+- added ravager CEM
+- added goat variants
+- added hoglin variant
+- added stone overlay
+- added sculk overlay
+
+
+August 27, 2023
+V[1.20]
+
+	Global
+- updated pack version (15)	
+- updated splashes
+- updated panorama
+
+	Bug Fixes
+- fixed title screen
+- fixed smithing table UI
+- fixed enchanting table z-fighting
+- fixed spawn egg z-fighting
+- fixed enchanted glint
+- fixed wall cullfacing
+- fixed stonebrick wall z-fighting
+- optimized leaf models
+
+	1.20 Features
+- added bamboo planks
+- added bamboo mosaic
+- added bamboo mosaic doubleslab (tatami mat)
+- added bamboo fence + gate
+- added bamboo sign + hanging sign
+- added bamboo raft
+- added bamboo door
+- added bamboo trapdoor
+- added block of bamboo
+- added stripped block of bamboo
+- added cherry log
+- added cherry leaves
+- added cherry planks
+- added cherry door
+- added cherry trapdoor
+- added cherry sign + hanging sign
+- added cherry boat
+- added pink petals
+- added torchflower
+- added pitcher plant
+- added chiseled bookshelf + 3D model
+- added hanging signs
+- added relic music disc
+- added brush
+- added potted cherry sapling model
+- added sniffer
+- added sniffer egg
+- added decorated pots
+- added sherds
+- added smithing templates
+- added suspicious sand
+- added suspicious gravel
+
+	Blocks
+- added tinted glass
+- added netherrack variants
+- added deepslate tiles top texture
+- added flower butterflies
+- updated polished deepslate
+- updated diorite color
+- updated granite color
+- updated lapis lazuli ore
+- updated item frame
+- updated anvil
+- updated stone bricks
+- updated deepslate bricks
+- updated lightning rod + added golden lightning rod (powered)
+- updated sea pickle
+- updated torches
+- updated red/pink concrete
+- updated blue/light- blue terracotta
+- updated composter model
+- updated spruce leaves
+- updated stripped spruce log
+- updated grass side
+- adjusted andesite
+- adjusted deepslate
+- adjusted wheat stages 6 + 7
+- adjusted gray/light-gray wool
+- tweaked red sandstone color
+- tweaked blackstone
+- tweaked mud
+
+	Items
+- added fire charge
+- updated totem of undying
+- updated golden sword
+- updated debug stick
+- updated lapis lazuli
+- updated chorus fruit
+- updated popped chorus fruit
+- updated map
+- tweaked birch door
+
+	Entities
+- added strider
+- added vex
+- added allay + added variant
+- added villager professions
+- added warden (WIP)
+- updated enchanting table book
+- updated beacon beam
+- updated end gateway beam
+- updated shulker head
+- updated snow villager
+- updated slime + added variants
+- updated evoker + added variant
+- updated charged creeper
+- adjusted horses
+
+	MISC
+- added player death sound effect	
+- added gamemode switcher UI (F3+F4)
+- added toasts UI
+- added "pigscene" painting
+- updated biome colormaps
+- updated experience orbs
+- updated "skeleton" map painting
+- updated leather armor
+- adjusted advancement UI
+- reduced moon size
+- swapped various paintings
+
+	Optifine
+- moved mob variants to random/entity folder
+- added "Dragon Slayer" sword CIT - (rename sword to "Dragon Slayer Greatsword")
+- added "Excalibur" sword CIT - (rename sword to "Diamond Excalibur")
+- added enchanting table book CEM
+- added lectern book CEM
+- added soulsand valley blaze
+- added flight duration firework textures
+- added allay model
+- added vex model
+- added rabbit model
+- added jockey chicken model
+- added baby chicken model
+- added blaze model
+- added horse model
+- added wandering trader variants
+- added piglin variant
+- added zombie variants
+- added frost spider variant
+- added frogspawn CTM
+- added goblin (baby zombie)
+- added infinity bow CIT
+- added enchanted books CIT
+- added reinforced deepslate CTM
+- added invisible armor
+- added sugar cane vertical CTM
+- added polished diorite overlay
+- removed bookshelf vertical CTM
+- removed enderman model
+- removed biome-specific bamboo sugar cane
+- removed material connections
+- removed text.sign color property
+- updated chest models for fabric (Thanks GrandPappyJay!)
+- adjusted cobblestone overlay
+- adjusted sheep model
+- adjusted skeleton model
+- adjusted creepers
+
+══════════════════════════════════════════════		
+May 3, 2023
+V[1.19.4]
+
+	Global
+- updated pack version (13)
+- moved "extra blocks" to addon pack
+
+	Bug Fixes
+- fixed 1.19.3 creative inventory
+- fixed birch fence/gate UV
+- fixed cake with candle model
+- fixed cauldron model
+- fixed horse inventory
+- fixed prismarine texture
+- fixed door models (Thanks GrandPappyJay!)
+
+	1.19 Features
+- added mud
+- added mud bricks
+- added packed mud
+- added mangrove leaves
+- added mangrove propagule
+- added mangrove log
+- added mangrove roots
+- added mangrove sign
+- added mangrove boat
+- added mangrove planks
+- added stripped mangrove log
+- added muddy mangrove roots
+- added music disc 5 
+- added disc fragment
+- added chest boats
+- added tadpole bucket
+- added frog eggs
+- added reinforced deepslate
+
+	Blocks
+- added deepslate brick variants
+- added smooth basalt
+- added respawn anchor
+- added shulker boxes
+- added smoker model
+- added angled rail models
+- added polished blackstone doubleslab (blackstone pillar)
+- added bee nest model
+- added enchanting table model
+- added allium variant + adjusted texture
+- added infested deepslate
+- added dragon egg animation + added model
+- updated glass
+- updated dandelion models
+- updated poppy model + added variants
+- updated bamboo
+- updated red sand color
+- updated clay block
+- updated end rod
+- updated redstone torches
+- updated brown concrete powder
+- updated cocoa beans + added models
+- updated budding amethyst
+- updated deepslate tiles
+- adjusted polished deepslate
+- adjusted chiseled deepslate
+- adjusted basalt colors
+- adjusted soul lantern color
+- adjusted birch forest grass color
+- adjusted coarse dirt distribution
+- adjusted acacia colors
+- adjusted beacon
+- adjusted dirt path color
+- adjusted moist farmland
+- adjusted seagrass/kelp colors
+- adjusted deepslate ores
+- tweaked spruce trapdoor
+- tweaked polished andesite
+- tweaked brewing stand
+
+	Entities
+- added trader llama	
+- added phantom + added model
+- updated wandering trader + added model
+- updated iron golem + added model
+- updated enderman + added model
+- updated donkey & mule saddle textures
+- tweaked spiders (added bottom texture)
+
+	Items
+- added dried kelp
+- added nautilus shell
+- added phantom membrane
+- added spyglass
+- added ender eye animation
+- updated shulker shell
+- adjusted rotten flesh
+- adjusted spawn eggs
+- tweaked stone hoe
+
+	User Interface
+- added unknown_pack icon
+- added 1.19 UI slider + tab textures
+- adjusted language select button
+- adjusted accessibility button
+- tweaked advancements window UI
+
+	Sounds
+- specified main menu music
+- removed custom horse leather sound
+- removed custom iron golem throw sound
+- optimized portal sounds (now within sounds.json)
+- added custom bow sound
+- added custom lever sound
+- added custom pick up sound
+- lowered anvil placing sound volume
+
+	Optifine
+- removed capitals from .properties files
+- removed sandstone top CTM
+- updated CEM formatting (Thanks GrandPappyJay!)
+- updated CIT formatting (Thanks GrandPappyJay!)
+- updated dye color properties
+- updated CIT tanning rack texture (Thanks GrandPappyJay!)
+- added prismarine repeated texture (Thanks GrandPappyJay!)
+- added unique CIT suspicious stews (Thanks GrandPappyJay!)
+- added unique CIT paintings
+- added cobblestone overlay
+- added netherrack overlay
+- added biome-specific spruce campfires
+- added birch planks CTM + variants
+- added spruce planks CTM
+- added prismarine bricks overlay
+- adjusted lightmaps
+
+	1.20 Experimental
+- added bamboo planks
+- added bamboo mosaic 
+- added bamboo fence & gate
+- added chiseled bookshelf
+- added hanging signs
+
+
+══════════════════════════════════════════════		
+February 6, 2022
+V[1.18.1]
+
+- updated pack icon (Thank you Brakrel!)
+- reduced pack size
+- optimized model folders
+- adjusted loom cullfacing
+- optimized leaf models
+- added glow lichen models
+- added large fern models (Thank you GrandPappyJay!)
+- added tall grass models (Thank you GrandPappyJay!)
+- updated lilypad models
+- added cake with candle model
+- added item frame shield model
+- fixed shield blocking model
+- fixed biome-specific soul sand
+- fixed skybox void textures
+
+- fixed inventory effects GUI
+- updated advancements GUI
+- added freezing hearts icons
+
+- updated prismarine
+- adjusted deepslate colors
+- added deepslate variant
+- updated polished deepslate
+- tweaked polished andesite
+- adjusted lava colors
+- added door close sounds
+- removed grass sounds
+- adjusted corals
+- updated salmon
+- adjusted pig saddle
+- added christmas chests
+- adjusted blaze
+- adjusted dark oak fence post
+- added rabbit hide
+- added glow ink sac
+- updated netherwart
+- tweaked music discs
+- added otherside music disc
+- adjusted stone hoe
+- added basalt
+- added polished basalt
+- darkened oak logs
+- tweaked fern
+
+- purplified enderman
+- purplified endermite
+- purplified end crystal
+- purplified ender pearl
+- purplified end chest
+- adjusted eye of ender
+- adjusted chorus plant
+- adjusted end sky
+
+
+══════════════════════════════════════════════		
+December 16, 2021
+V[1.18]
+
+- updated ghast shooting
+- updated bears
+- updated stray
+- adjusted pufferfish + added model
+- updated cow + model
+- updated mooshroom + model
+- updated chicken model
+- updated creeper model
+- added squid model
+- updated spider models
+- added piglin
+- added piglin brute
+- updated zombie piglin
+- updated pig colors
+
+- updated bamboo
+- updated cobbled deepslate
+- adjusted large fern
+- added moss carpet overhang model
+- updated spruce fence colors to match planks
+- adjusted hopper
+- adjusted beetroot crops
+
+- fixed biome-specific textures
+- updated biome colormap
+- updated spruce colormap
+- updated birch colormap
+- updated lightmap
+
+
+══════════════════════════════════════════════		
+November 28, 2021
+V[1.17]
+
+- added glow item frame
+- added axolotl bucket
+- added powder snow bucket
+- added rooted dirt
+- added hanging roots
+- added copper ore
+- added copper ingot
+- added copper blocks
+- added lightning rod
+- added candles
+- added amethyst blocks
+- added amethyst shard
+- added deepslate with variants
+- added deepslate ores
+- added deepslate tiles
+- added cracked deepslate tiles
+- added deepslate bricks
+- added cracked deepslate tiles
+- added cobbled deepslate
+- added polished deepslate
+- added chiseled deepslate
+- added dripstone block
+- added moss block
+- added glow squid
+- added glow lichen
+- added powder snow
+- added azalea bush
+- added azalea leaves
+- added glow berry vine
+
+- updated monster spawner color
+- updated bedrock
+- added ancient debris
+- added soul soil
+- updated soul sand
+- updated dark oak log
+- updated stripped birch log
+- added flower pot bottoms
+- updated spectral arrow entity
+- added blackstone
+- added gilded blackstone
+- added polished blackstone
+- added chiseled polished blackstone
+- added cracked polished blackstone bricks
+- added polished blackstone bricks
+- added polished blackstone button
+- updated crimson button (book stack) model
+- added missing pressure plate textures
+- updated crimson planks
+- added crimson doubleslab
+- added crimson trapdoor
+- updated warped planks
+- added warped trapdoor
+- adjusted sunflower stem
+- added structure void
+- adjusted emerald block
+- added honeycomb block
+- updated beehive
+- updated cracked stone bricks + added variant
+- tweaked vines
+- adjusted white terracotta color to match concrete
+- added mossy stone brick wall model
+- adjusted wall models
+- adjusted green concrete
+- added crimson fungus model
+- updated snow block
+- updated clay block
+- added biome-specific deadbush pot texture
+
+- adjusted stick, emerald, carrots, beetroot, fishing rods, flint, tropical fish, item frame, armor stand, repeater, comparator, flower pot, and more items
+- updated glass bottles and potions
+- updated cooked cod
+- added magma cream
+- adjusted trident
+- updated door items
+- updated sign items
+- updated boat items
+- updated minecart items
+- updated leather
+- updated scute
+- added knowledge book
+- added raw/cooked mutton
+- added raw/cooked rabbit
+- updated sweet berries
+- added glow berries
+- updated spider eye
+- updated cauldron item
+- updated hopper item
+- updated iron nugget
+- adjusted gold nugget
+- added raw iron
+- added raw gold
+- added raw copper
+- added netherite scrap
+- updated netherite item colors
+- added netherite armor
+- updated diamond helmet item
+- updated chain armor
+- added honeycomb
+- updated honey bottle
+- updated kelp
+- updated chorus fruit items
+- added heart of the sea
+- adjusted flower pot texture to match bricks
+- updated spawn egg
+
+- updated boar texture
+- added rabbits
+- adjusted sheep wool
+- updated evoker
+- added vindicator
+- added dolphin
+- adjusted creeper model
+- adjusted horses
+- added ducks (river specific chickens)
+- updated elder guardian
+- added wither/wither skeleton model
+
+- fixed chest models (optifine)
+- fixed extinguished soul campfire cullfacing
+- fixed banner patterns (Thank you TrinalDust!)
+- added optifine carpet item textures (Thank you GrandPappyJay!)
+
+- updated hotbar and menu buttons UI
+- adjusted creative UI to promote visibility
+- adjusted recipe book UI
+
+
+══════════════════════════════════════════════			
+January	23, 2021
+V[1.16]
+
+- added chiseled netherbricks
+- added cracked netherbicks
+- updated netherbrick doubleslab
+- updated red netherbrick + added variants
+- added shroomlight
+- added zombie piglin
+- added quartz bricks
+- added warped wart block
+- updated nether wart block
+- added weeping vines
+- added crying obsidian
+- added warped fungus + 3D model
+- added warped fungus on a stick
+- added crimson planks
+- added crimson door
+- added crimson nylium
+- added crimson roots
+- added warped nylium
+- added warped roots
+- added netherite tools
+- added netherite block
+- added pigstep music disc
+- added lodestone
+- added target block
+- added crimson stem
+- added warped stem
+- added soul fire
+
+- fixed stonebrick wall
+- updated sandstone wall
+- adjusted lava and magma colors
+- adjusted lightmaps
+- tweaked many items
+- added drowned
+- added banner pattern items
+- added tube coral block
+- adjusted wool textures up 1 pixel
+- added brown carpet texture (bear fur)
+- added potted dead bush model
+- added lantern item models
+- added custom barrels with optifine
+- adjusted wall torch model
+- adjusted redstone torch models
+- adjusted spruce trapdoor
+- adjusted dark oak trapdoor + door
+- added seagrass cattails with optifine
+- added poppy model
+- updated oxeeye daisy
+- adjusted farmland sides
+- adjusted potato model and texture
+- adjusted beetroot model
+- tweaked oak leaf highlights
+- adjusted beds
+- updated gold helmet to a crown
+- updated concrete powders
+- added smithing table UI
+- added stonecutter model
+- added loom model
+- adjusted cartography table model
+- updated iron colors (lanterns, chains, iron bars, rails, etc)
+- updated lever texture
+- updated oak pressure plate
+- updated stone pressure plate
+- added jungle pressure plate model
+- added buckets (warped button)
+- added books (crimson button)
+- added animation to flame particle
+- added log pile (extinguished soul campfire)
+- adjusted polished andesite color
+- adjusted dark oak fence post texture
+- adjusted fence tops
+- updated stained glass
+- updated observer
+- updated daylight sensor
+- removed iron bell (dragon egg)
+- updated spruce log
+- updated acacia log
+- updated log tops
+- updated stripped jungle log
+- updated jungle plank doubleslab top
+
+
+══════════════════════════════════════════════			
+June 17, 2020		
+V[1.15]
+
+- updated Excalibur naming-scheme
+- updated pack version (5)
+
+- added beehive
+- added bee nest
+- added bees
+- added honey block
+- added honey bottle
+- added crossbow
+
+- fixed chest mapping
+- fixed banner formatting
+- bandaid fixed transparent paintings (temporary)
+- updated enchantment glint
+- added iron golem damage indicators
+- adjusted chicken model
+- adjusted pig model
+- removed squid model
+- added blue squid variant
+- updated beetroot item
+- adjusted kelp item
+- added flies to rotten flesh item
+- adjusted spider eye
+- updated slime block
+- adjusted slime mob
+- added rats (silverfish that spawn above ground)
+- updated leaf models
+- adjusted jungle leaves
+- updated jungle button
+- updated note block
+- updated tripwire hook model to tap (for barrels or faucets)
+
+
+1.16:
+- added soul fire torch
+- added soul fire lantern
+- added nether sprouts
+- added chain block
+- added nether gold ore
+
+
+══════════════════════════════════════════════			
+October 22, 2019		
+V[1.4]		
+
+NEW:
+Discuss Excalibur on Discord! https://discord.gg/qYZ9Pen
+
+1.14:
+- added signs
+- added wall models
+- added scaffolding
+- added lantern
+- added bell
+- added barrel
+- added campfire + particles
+- removed coal from unlit campfire
+- added new dyes
+- added foxes
+- added composter
+- added loom
+- added bamboo
+- added grindstone
+- added pillager
+- added trader
+- added smoker
+- added cornflower
+- added wither rose
+- added lily of the valley
+- added lectern
+- added stonecutter
+- added blast furnace
+- added cartography table
+- added sweet berry bushes + items
+- added fletching table
+- added smithing table
+- added temporary ravager 
+
+BLOCKS:
+- discovered fire
+- added kelp
+- added pink carpet CTM
+- added lime carpet CTM
+- removed sand (snow) layer from ocean, river, and beach biomes
+- adjusted banner
+- added smoke (nether cobwebs)
+- adjusted ladder 3D model
+- updated sandstone top
+- adjusted water opacity
+- adjusted tripwire string
+- updated brewing stand
+- updated sand and red sand
+- updated pumpkin/melon stems
+- added pumpkin 3D model
+- updated path block and added overlay
+- updated acacia door and model
+- updated birch door and added model
+- added vertical acacia plank CTM
+- updated large mushrooms
+- updated packed ice and added vertical CTM
+- added blue ice
+- removed dark oak variants
+- adjusted acacia fence
+- updated crop textures and added 3D models
+- adjusted crafting table
+- added dark oak pressure plate (chess board)
+- adjusted polished granite
+- adjusted cactus and added flowers
+- adjusted hopper texture
+- adjusted dirt colors
+- updated tallgrass
+- updated mossy cobblestone wall and added CTM
+- updated oak leaves
+- updated birch leaves
+- adjusted TNT
+- updated rails and models
+- added orange concrete CTM
+- adjusted observer
+- fixed cobweb CTM
+- updated inverted daylight sensor
+- updated prismarine blocks
+- updated redstone block
+- updated spruce trapdoors to match the door/planks
+- updated potatoes
+- added chandelier model (end rod)
+- added chest models (optifine CEM)
+- added farmland side textures
+- added polished andesite slabs
+- updated quartz blocks
+- added 3D mushroom models w/ variants
+- updated itemframe map
+- added green glazed terracotta
+- updated magenta, purple, pink glazed terracotta
+- removed red carpet model
+- added purple carpet CTM
+- added orange carpet CTM
+
+ITEMS:
+- adjusted saddle
+- added kelp
+- added beetroot
+- added trident
+- adjusted books
+- added written book
+- added filled map
+- updated spawn eggs
+- added debug stick texture
+- updated dragons breath
+- added turtle shell helmet and scute
+- lowered shield model
+- added fence models
+- updated emerald
+- added name tag
+- added suspicious stew
+
+MOBS:
+- updated chicken model (optifine)
+- added fish
+- added horse armor
+- added horse patterns
+- added sea turtle
+- added mooshroom variant
+- added squid model (optifine)
+- added baby chicken texture (optifine)
+- added biome-specific bears (optifine)
+
+MISC:
+- added font	
+- optimized en_us lang file
+- removed unused models
+- updated enchantment glint
+- adjusted creative GUI
+- adjusted night sky
+- updated map icons
+- updated recipe book button
+- adjusted lightmap
+- adjusted colormaps (sky, water, fog, etc)
+- added xp bars
+- added nether portal animation
+- readded village sounds (HRMM)
+- removed banner patterns
+- adjusted GUIs
+- removed "generated" handheld item models
+- separated leaf models
+- updated particles
+- removed custom clouds texture from "/environment"
+- reduced portal sound volume
+- added empty armor icons
+
+
+BUG FIXES:
+- moved mcpatcher folder to optifine folder
+- fixed optifine custom biome property files
+- fixed general errors and warnings
+- fixed loading screen scaling
+- flipped rain textures
+- removed custom menu click sound
+- changed sounds from stereo to mono
+- fixed cullface issue on the bottom of birch fences
+- fixed stone brick slab models
+- fixed jungle fence UV
+- fixed z-fighting on bottom of iron bars
+- fixed z-fighting on leather items
+
+
+══════════════════════════════════════════════			
+October 11, 2018		
+V[1.3]
+
+MOBS:
+- added thin sheep legs
+- updated blaze
+- added endermite
+- updated parrots with various birds (hawk, seagull, pigeon, crow)
+- updated shulker faces
+- adjusted villagers and added noses	
+- added ocelots
+- added bat
+- added ghast
+- added zombie horse 
+- added skeleton horse
+- added donkey
+- added mule
+- updated horses to 1.13
+- added steve/alex
+- added polar bear
+- added llamas
+- added guardian
+- added elder guardian
+- added illagers
+- added evoker
+- added illusioner
+
+BLOCKS:
+- adjusted dark oak planks + added CTM
+- adjusted iron block + CTM
+- updated blue, yellow, and white beds
+- adjusted shulker boxes
+- added command blocks
+- updated log tops
+- updated glowstone
+- updated smooth andesite
+- updated netherbrick and added doubleslab
+- adjusted hay colors
+- updated light grey shulker (cage)
+- updated jungle planks
+- updated birch planks
+- adjusted iron door
+- added chorus plant
+- added end crystal
+- updated grass/path side	
+- updated dirt
+- removed coarse dirt variant
+- updated oxeye daisy
+- added dark oak upper/doubleslab
+- updated chests
+- updated concretes
+- updated brown powder
+- redid bricks
+- added glazed terracotta
+- updated hopper
+- added dark oak stair/slab model
+- updated dark oak fence gate
+- adjusted item frame model
+- added brazier model (end rod)
+- fixed birch fence variant
+- added wattle (birch) fence
+- added gold coins (gold pressure plate)
+- added cactus juice flower pot model
+- added iron bell model (dragon egg)
+- updated 3D ladder model and texture
+- added dirt slabs + item model
+- added random red mushrooms
+- adjusted spruce crate
+- added button models  
+- added strip wood
+- added bark blocks
+- added trapdoors + 3D models
+- added sea pickle
+- added sea grass
+- added purple shulker 
+- added dried kelp
+- added turtle egg
+- updated spruce and dark oak (fire wood) stripped logs
+
+ITEMS
+- updated chain armor
+- updated leather armor
+- updated iron armor
+- adjusted tipped arrows
+- updated feather
+- added rotten flesh
+- updated egg
+- updated string
+- added lead
+- updated meats
+- added pumpkin pie
+- added chorus fruit
+- added totem of undying
+- added blaze rod
+- adjusted leather
+- adjusted saddle
+- added rabbit's foot
+- added rabbit stew
+- adjusted barrier
+- added cookie
+- added blaze powder
+- updated ingots
+- added netherbrick
+- added broken elytra
+- added cake
+- added dyes
+- added diamond
+- redid coal/charcoal
+- added brewing stand
+- added slimeball
+- redid cauldron
+- redid hopper
+- added nether wart
+- updated spider- eye
+- updated minecarts
+- added glowstone
+- added iron nugget
+- redid gold nugget
+- updated emerald
+- added snowball
+- redid books
+- added clay ball
+- added chicken
+- added potatoes
+- added clock
+- added compass
+- added shulker shell
+- added prismarine shard/crystal
+- added music discs
+- added fish buckets
+
+MISC:
+- updated panorama
+- updated GUI buttons
+- adjusted birch leaves color
+- adjusted biome colors (forest, extreme hills)
+- added podzol transition
+- added grass transition to mud
+- fixed particles
+- updated all models to 1.13 format
+- removed inventory "pop" sound (due to a problem with underwater ambiance)
+
+CIT:	
+- added mirror model
+- added wheel model
+- added round shield		
+- updated shield item frame model
+- added tanning rack
+
+
+══════════════════════════════════════════════		
+December 22, 2017
+V[1.2]
+
+BLOCKS:
+- added terracotta blocks (orange, black, white, red, silver)  
+- added colored beds
+- added concrete blocks
+- added concrete powder
+- added silverfish blocks
+- added observer 
+- added shulker boxes
+- updated brick
+- updated quartz
+- updated diorite
+- updated sign
+- adjusted sponge
+- adjusted bedrock
+- updated glowstone
+- updated stained glass
+- added glass top
+- updated magma block
+- updated sandstone with variants
+- added sandstone doubleslab textures
+- updated carved red sandstone
+- added lapis block with CTM
+- added carpet textures and CTM (red, yellow, green)
+- added oak plank horizontal CTM
+- adjusted dark oak planks
+- updated acacia planks
+- added acacia doubleslab textures
+- added acacia doubleslab repeat CTM
+- adjusted crafting tables and added variants
+- updated pumpkin
+- adjusted melon
+- adjusted birch leaves
+- updated oak leaves
+- updated saplings and deadbush and added models
+- updated sunflower
+- updated podzol and added variants
+- updated double fern
+- updated fern variants
+- added flower pot variants
+- added bonsai tree flower pot 
+- added flower variants (dandelion, houstonia, allium)
+- added coarse dirt variants
+
+- added 3D trapdoor models
+- updated fence models
+- updated gate models
+- adjusted spruce door
+- adjusted jungle door and added 3D model
+- updated oak door and added 3D model
+- updated acacia door and added 3D model
+- adjusted iron door and added 3D model
+- updated cobblestone wall model
+
+- added 3D table (old_wood slab)
+- added 3D chair (old_wood slab)
+- updated 3D beacon model
+- added 3D coal block
+- added 3D candelabra(redstone comparator)
+- added item frame model
+- added 3D lantern (end rod)
+- added subtle leaf models
+- updated cake texture and added variants/3D model
+- adjusted shield first person model
+- added shovel item first person model
+- adjusted item first person models
+- update wheat models and added variant
+- added lilypad flower model with variants
+- added 3D pebbles model (floor stone buttons)
+- updated button models
+- added 3D iron bars model
+- adjusted 3D ladder model and texture
+- added 3D candle model with variants
+- added 3D torch model
+- updated 3D bookshelves with variants and vertical CTM
+- updated cauldron model
+- updated tripwire model
+- updated lever model
+- updated hopper model
+
+- update hardened clay CTM
+- added snow transition CTM
+- added grass transition CTM
+- added diamond block CTM
+- added redstone block vertical CTM
+- added stonebrick-cobble transition CTM
+- updated chiseled stonebrick vertical CTM
+- added chiseled quartz vertical CTM
+- added cobblestone vertical CTM and updated stairs/slabs
+
+ITEMS:
+- updated diamond armor
+- updated chain armor boots item
+- updated iron armor item
+- updated gold item color
+- added item textures ( shears, spawn egg, ingots, brick, flintsteel, redstone, gunpowder, spider eyes, carrots, buckets, feather, fishes, armor stand, ghast tear, gold nugget, dyes)
+
+MOBS:
+- added Spiders
+- added Parrots
+- added Camo-Creepers
+- added Foxes (forest spawning Wolves)
+- added new entity models (Chicken, Pig, Sheep, Spiders, Skeletons, Pigmans, Cow/Mooshroom) 
+
+MISC:
+- adjusted paintings
+- added break animation
+- updated GUI
+- updated title screen and panorama background
+- updated skybox 
+- adjusted biome colors
+- adjusted map colors and icons
+- adjusted wool colors
+- removed hurt sounds
+- optimized CTM
+- fixed leaves on fast graphics
+- fixed white reeds
+- updated en_us lang file
+
+
+══════════════════════════════════════════════
+August 27, 2016
+[V1.1]
+
+- fixed daytime skybox
+- added Husk
+- added Magma Cube
+- added Slime
+- added Snow Golem
+- added Zombie Villagers
+- added boats
+- added spruce and jungle doubleslab crate textures 
+- updated Horses
+- updated Skeleton
+- updated Witch
+- updated Wither
+- updated Wither Skeleton
+- updated Zombie Pigman
+- updated block of coal into coal crates
+
+
+══════════════════════════════════════════════
+July 29, 2016
+[V1.0]
+
+- First official release

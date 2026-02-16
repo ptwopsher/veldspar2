@@ -1,0 +1,107 @@
+{
+    "pack": {
+        "pack_format": 75,
+        "supported_formats": { "min_inclusive": 18, "max_inclusive": 999 },
+        "min_format": [ 18,0 ],
+        "max_format": [ 999,0 ],
+        "description": "\u00A77Adventure Awaits \n\u00A74By Maffhew \u00A77for \u00A76MC 1.21.11"
+    },
+    "overlays": {
+        "entries": [
+            {
+                "directory": "overlay_mod_support",
+                "formats": { "min_inclusive": 18, "max_inclusive": 999 },
+                "min_format": [ 18,0 ],
+                "max_format": [ 999,0 ]
+            },		
+            {
+                "directory": "overlay_1.21.11",
+                "formats": { "min_inclusive": 18, "max_inclusive": 75 },
+                "min_format": [ 18,0 ],
+                "max_format": [ 75,0 ]
+            },
+            {
+                "directory": "overlay_1.21.10",
+                "formats": { "min_inclusive": 18, "max_inclusive": 69 },
+                "min_format": [ 18,0 ],
+                "max_format": [ 69,0 ]
+            },
+            {
+                "directory": "overlay_1.21.8",
+                "formats": { "min_inclusive": 18, "max_inclusive": 64 },
+                "min_format": [ 18,0 ],
+                "max_format": [ 64,0 ]
+            },
+            {
+                "directory": "overlay_1.21.6",
+                "formats": { "min_inclusive": 18, "max_inclusive": 63 },
+                "min_format": [ 18,0 ],
+                "max_format": [ 63,0 ]
+            },
+            {
+                "directory": "overlay_1.21.5",
+                "formats": { "min_inclusive": 18, "max_inclusive": 55 },
+                "min_format": [ 18,0 ],
+                "max_format": [ 55,0 ]
+            },
+            {
+                "directory": "overlay_1.21.4",
+                "formats": { "min_inclusive": 18, "max_inclusive": 46 },
+                "min_format": [ 18,0 ],
+                "max_format": [ 46,0 ]
+            },
+            {
+                "directory": "overlay_1.21.3",
+                "formats": { "min_inclusive": 18, "max_inclusive": 42 },
+                "min_format": [ 18,0 ],
+                "max_format": [ 42,0 ]
+            },
+            {
+                "directory": "overlay_1.21.1",
+                "formats": { "min_inclusive": 18, "max_inclusive": 34 },
+                "min_format": [ 18,0 ],
+                "max_format": [ 34,0 ]
+            },
+            {
+                "directory": "overlay_1.20.6",
+                "formats": { "min_inclusive": 18, "max_inclusive": 32 },
+                "min_format": [ 18,0 ],
+                "max_format": [ 32,0 ]
+            },
+            {
+                "directory": "overlay_1.20.4",
+                "formats": { "min_inclusive": 18, "max_inclusive": 22 },
+                "min_format": [ 18,0 ],
+                "max_format": [ 22,0 ]
+            },
+            {
+                "directory": "overlay_1.20.2",
+                "formats": { "min_inclusive": 18, "max_inclusive": 18 },
+                "min_format": [ 18,0 ],
+                "max_format": [ 18,0 ]
+            },
+
+
+
+
+            {
+                "directory": "cit_current",
+                "formats": { "min_inclusive": 18, "max_inclusive": 99 },
+                "min_format": [ 18,0 ],
+                "max_format": [ 99,0 ]
+            },
+            {
+                "directory": "cit_1.21.4",
+                "formats": { "min_inclusive": 32, "max_inclusive": 46 },
+                "min_format": [ 32,0 ],
+                "max_format": [ 46,0 ]
+            },
+            {
+                "directory": "cit_1.20.4",
+                "formats": { "min_inclusive": 18, "max_inclusive": 22 },
+                "min_format": [ 18,0 ],
+                "max_format": [ 22,0 ]
+            }
+        ]
+    }
+}

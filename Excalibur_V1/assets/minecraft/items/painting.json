@@ -1,0 +1,375 @@
+{
+  "model": {
+    "type": "minecraft:composite",
+    "models": [
+      {
+        "type": "minecraft:select",
+        "property": "minecraft:component",
+        "component": "minecraft:painting/variant",
+        "cases": [
+          {
+            "when": "minecraft:alban",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/alban"
+            }
+          },
+          {
+            "when": "minecraft:aztec",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/aztec"
+            }
+          },
+          {
+            "when": "minecraft:aztec2",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/aztec2"
+            }
+          },
+          {
+            "when": "minecraft:backyard",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/backyard"
+            }
+          },
+          {
+            "when": "minecraft:baroque",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/baroque"
+            }
+          },
+          {
+            "when": "minecraft:bomb",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/bomb"
+            }
+          },
+          {
+            "when": "minecraft:bouquet",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/bouquet"
+            }
+          },
+          {
+            "when": "minecraft:bust",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/bust"
+            }
+          },
+          {
+            "when": "minecraft:burning_skull",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/burning_skull"
+            }
+          },
+          {
+            "when": "minecraft:cavebird",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/cavebird"
+            }
+          },
+          {
+            "when": "minecraft:changing",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/changing"
+            }
+          },
+          {
+            "when": "minecraft:cotan",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/cotan"
+            }
+          },
+          {
+            "when": "minecraft:courbet",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/courbet"
+            }
+          },
+          {
+            "when": "minecraft:creebet",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/creebet"
+            }
+          },
+          {
+            "when": "minecraft:dennis",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/dennis"
+            }
+          },		  
+          {
+            "when": "minecraft:donkey_kong",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/donkey_kong"
+            }
+          },
+          {
+            "when": "minecraft:earth",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/earth"
+            }
+          },
+          {
+            "when": "minecraft:endboss",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/endboss"
+            }
+          },
+          {
+            "when": "minecraft:fern",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/fern"
+            }
+          },
+          {
+            "when": "minecraft:fighters",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/fighters"
+            }
+          },
+          {
+            "when": "minecraft:finding",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/finding"
+            }
+          },
+          {
+            "when": "minecraft:fire",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/fire"
+            }
+          },
+          {
+            "when": "minecraft:graham",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/graham"
+            }
+          },
+          {
+            "when": "minecraft:humble",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/humble"
+            }
+          },
+          {
+            "when": "minecraft:kebab",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/kebab"
+            }
+          },
+          {
+            "when": "minecraft:lowmist",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/lowmist"
+            }
+          },
+          {
+            "when": "minecraft:match",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/match"
+            }
+          },
+          {
+            "when": "minecraft:meditative",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/meditative"
+            }
+          },
+          {
+            "when": "minecraft:orb",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/orb"
+            }
+          },
+          {
+            "when": "minecraft:owlemons",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/owlemons"
+            }
+          },
+          {
+            "when": "minecraft:passage",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/passage"
+            }
+          },
+          {
+            "when": "minecraft:pigscene",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/pigscene"
+            }
+          },
+          {
+            "when": "minecraft:plant",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/plant"
+            }
+          },
+          {
+            "when": "minecraft:pointer",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/pointer"
+            }
+          },
+          {
+            "when": "minecraft:pond",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/pond"
+            }
+          },
+          {
+            "when": "minecraft:pool",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/pool"
+            }
+          },
+          {
+            "when": "minecraft:prairie_ride",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/prairie_ride"
+            }
+          },
+          {
+            "when": "minecraft:sea",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/sea"
+            }
+          },
+          {
+            "when": "minecraft:skeleton",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/skeleton"
+            }
+          },
+          {
+            "when": "minecraft:skull_and_roses",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/skull_and_roses"
+            }
+          },
+          {
+            "when": "minecraft:stage",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/stage"
+            }
+          },
+          {
+            "when": "minecraft:sunflowers",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/sunflowers"
+            }
+          },
+          {
+            "when": "minecraft:sunset",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/sunset"
+            }
+          },
+          {
+            "when": "minecraft:tides",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/tides"
+            }
+          },
+          {
+            "when": "minecraft:unpacked",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/unpacked"
+            }
+          },
+          {
+            "when": "minecraft:void",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/void"
+            }
+          },
+          {
+            "when": "minecraft:wanderer",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/wanderer"
+            }
+          },
+          {
+            "when": "minecraft:wasteland",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/wasteland"
+            }
+          },
+          {
+            "when": "minecraft:water",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/water"
+            }
+          },
+          {
+            "when": "minecraft:wind",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/wind"
+            }
+          },
+          {
+            "when": "minecraft:wither",
+            "model": {
+              "type": "minecraft:model",
+              "model": "minecraft:item/excalibur/painting/wither"
+            }
+          }
+        ],
+        "fallback": {
+          "type": "minecraft:model",
+          "model": "minecraft:item/painting"
+        }
+      }
+    ]
+  }
+}

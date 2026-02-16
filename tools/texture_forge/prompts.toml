@@ -1,0 +1,82 @@
+# Veldspar Texture Forge — Prompt List
+# Each texture is 16x16 pixel art, seamless tileable
+
+[[textures]]
+name = "bedstone"
+prompt = "A seamless tileable 16x16 pixel art texture of dark gray bedrock stone. Painterly style with subtle cracks and mineral flecks. Colors: charcoal gray, slate, tiny specks of iron black. No borders or frames, just the raw seamless texture filling the entire image."
+
+[[textures]]
+name = "granite"
+prompt = "A seamless tileable 16x16 pixel art texture of speckled granite rock. Hand-painted style with visible quartz crystals and feldspar patches. Colors: warm gray, pink-gray, white flecks, black mica spots. Must tile in all directions. No borders, just texture."
+
+[[textures]]
+name = "loam"
+prompt = "A seamless tileable 16x16 pixel art texture of rich brown soil or loam. Painterly pixel art with tiny root fibers and pebble details. Colors: dark brown, chocolate, tan, tiny gray pebble spots. Fully seamless tiling. No borders, just texture."
+
+[[textures]]
+name = "verdant_top"
+prompt = "A seamless tileable 16x16 pixel art texture of a grass surface viewed from above. Lush painterly green with individual blade suggestions and subtle yellow-green variation. Colors: forest green, lime, sage, dark green shadows. Not Minecraft style - more painterly and organic. No borders, just texture."
+
+[[textures]]
+name = "verdant_side"
+prompt = "A seamless tileable 16x16 pixel art texture of a grass block side face. Brown dirt on the bottom two-thirds transitioning to green grass fringe along the top edge (3-4 pixels of green). Painterly style. Must tile horizontally. No borders, just texture."
+
+[[textures]]
+name = "dune_sand"
+prompt = "A seamless tileable 16x16 pixel art texture of wind-swept desert sand. Painterly pixel art with subtle ripple patterns and warm shadows. Colors: golden ochre, warm tan, cream highlights, amber shadows. Fully seamless. No borders, just texture."
+
+[[textures]]
+name = "timber_end"
+prompt = "A seamless tileable 16x16 pixel art texture of a freshly cut log end showing tree rings. Painterly concentric rings in warm wood tones. Colors: tan, honey brown, dark brown ring lines, cream sapwood edge. Square format. No borders, just texture."
+
+[[textures]]
+name = "timber_bark"
+prompt = "A seamless tileable 16x16 pixel art texture of rough tree bark. Painterly vertical furrows and ridges. Colors: dark brown, gray-brown, moss green hints in crevices, warm brown highlights. Must tile vertically and horizontally. No borders, just texture."
+
+[[textures]]
+name = "hewn_plank"
+prompt = "A seamless tileable 16x16 pixel art texture of hand-hewn wooden planks running horizontally. Painterly wood grain with visible saw marks. Colors: warm honey, golden brown, darker grain lines, subtle knot suggestions. 3-4 plank widths visible. No borders, just texture."
+
+[[textures]]
+name = "canopy_leaves"
+prompt = "A seamless tileable 16x16 pixel art texture of dense leaf canopy viewed from the side. Painterly clusters of small leaves with depth. Colors: deep green, emerald, dark shadow gaps, tiny lime highlights. Some gaps showing through for a semi-transparent feel. No borders, just texture."
+
+[[textures]]
+name = "still_water"
+prompt = "A seamless tileable 16x16 pixel art texture of clear still water surface viewed from above. Painterly with subtle caustic ripple patterns. Colors: teal blue, deep blue shadows, cyan-white caustic highlights. Translucent appearance. No borders, just texture."
+
+[[textures]]
+name = "rubblestone"
+prompt = "A seamless tileable 16x16 pixel art texture of rough cobblestone or rubble. Painterly irregular rounded stones mortared together. Colors: medium gray, blue-gray, light gray highlights, dark gray mortar gaps. Varied stone sizes. No borders, just texture."
+
+[[textures]]
+name = "iron_vein"
+prompt = "A seamless tileable 16x16 pixel art texture of gray stone with visible iron ore veins running through it. Painterly style with orange-rust ore clusters embedded in rock. Colors: gray stone base, rusty orange-brown ore patches, dark crevices. No borders, just texture."
+
+[[textures]]
+name = "crystal_pane"
+prompt = "A seamless tileable 16x16 pixel art texture of transparent glass or crystal pane. Painterly with subtle imperfections and refraction hints. Colors: very pale blue-white, faint bubble dots, slight tint variation. Mostly transparent feeling. No borders, just texture."
+
+[[textures]]
+name = "kiln_brick"
+prompt = "A seamless tileable 16x16 pixel art texture of fired clay bricks in a standard running bond pattern. Painterly with each brick slightly different shade. Colors: warm terracotta red, burnt sienna, cream mortar lines, some bricks darker. No borders, just texture."
+
+[[textures]]
+name = "gravel_bed"
+prompt = "A seamless tileable 16x16 pixel art texture of loose river gravel. Painterly small pebbles and stones of various sizes. Colors: gray, beige, brown, some white quartz pebbles, dark gaps between stones. No borders, just texture."
+
+[[textures]]
+name = "snowcap_top"
+prompt = "A seamless tileable 16x16 pixel art texture of fresh snow surface viewed from above. Painterly with subtle crystal sparkle and blue shadows. Colors: pure white, very pale blue shadows, tiny bright sparkle pixels. No borders, just texture."
+
+[[textures]]
+name = "snowcap_side"
+prompt = "A seamless tileable 16x16 pixel art texture of a snow-topped block side. White snow layer on top 3-4 pixels, brown dirt below. Painterly style with snow overhang drip detail. Must tile horizontally. No borders, just texture."
+
+[[textures]]
+name = "obsidian"
+prompt = "A seamless tileable 16x16 pixel art texture of dark volcanic obsidian rock. Painterly with glossy highlights and conchoidal fracture patterns. Colors: deep black, very dark purple, glassy highlight streaks of dark gray. No borders, just texture."
+
+[[textures]]
+name = "sandstone"
+prompt = "A seamless tileable 16x16 pixel art texture of yellow-gold sandstone with visible sediment layers. Painterly with horizontal stratification lines. Colors: warm gold, sandy tan, amber layer lines, cream highlights. No borders, just texture."

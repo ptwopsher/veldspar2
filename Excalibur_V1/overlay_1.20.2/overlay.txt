@@ -1,0 +1,5 @@
+overlay_1.20.2 summary
+
+- Overrides the grass blockstate to use multiple weighted model variants (block/foliage/grass/* plus low_grass).
+- Provides a custom grass block texture at assets/minecraft/textures/block/grass.png.
+- Provides a custom bat texture at assets/minecraft/textures/entity/bat.png.

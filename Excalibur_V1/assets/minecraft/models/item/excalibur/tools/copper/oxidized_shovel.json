@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/shovel",
+  "textures": {
+    "layer0": "minecraft:item/excalibur/tools/oxidized_shovel"
+  }
+}

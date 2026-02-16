@@ -1,0 +1,14 @@
+[package]
+name = "veldspar_shared"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { workspace = true }
+bincode = { workspace = true }
+glam = { workspace = true }
+noise = { workspace = true }
+bitvec = { workspace = true }
+bitflags = { workspace = true, features = ["serde"] }
+bytemuck = { workspace = true }
+tracing = { workspace = true }

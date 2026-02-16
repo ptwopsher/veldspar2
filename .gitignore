@@ -1,0 +1,22 @@
+.DS_Store
+
+# Rust / build
+target/
+**/target/
+
+# Local dev
+.claude/settings.local.json
+
+# Generated worlds / saves
+worlds/
+world/
+
+# Textures (large binaries)
+assets/textures/
+Excalibur_V1/**/*.png
+Excalibur_V1/**/*.jpg
+Excalibur_V1/**/*.jpeg
+Excalibur_V1/**/*.tga
+Excalibur_V1/**/*.webp
+Excalibur_V1/**/*.psd
+

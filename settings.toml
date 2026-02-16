@@ -1,0 +1,4 @@
+render_distance = 12
+mouse_sensitivity = 2.5
+fov = 70.0
+show_fps = false

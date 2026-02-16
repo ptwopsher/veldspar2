@@ -1,0 +1,9 @@
+[package]
+name = "region_inspector"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+veldspar_shared = { path = "../../crates/veldspar_shared" }
+veldspar_persist = { path = "../../crates/veldspar_persist" }
+serde = { workspace = true }

@@ -1,0 +1,12 @@
+[package]
+name = "veldspar_persist"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+veldspar_shared = { path = "../veldspar_shared" }
+serde = { workspace = true }
+bincode = { workspace = true }
+zstd = { workspace = true }
+lz4_flex = { workspace = true }
+tracing = { workspace = true }

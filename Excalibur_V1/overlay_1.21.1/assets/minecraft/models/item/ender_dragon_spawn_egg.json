@@ -1,0 +1,365 @@
+{
+	"credit": "Made with Blockbench - GrandPappyJay",
+	"textures": {
+		"particle": "item/ender_dragon_spawn_egg",
+		"egg": "item/ender_dragon_spawn_egg"
+	},
+	"elements": [
+		{
+			"name": "ender_dragon_spawn_egg_0",
+			"from": [2, 8, 7.5],
+			"to": [3, 16, 8.5],
+			"faces": {
+				"north": {"uv": [3, 0, 2, 8], "texture": "#egg"},
+				"east": {"uv": [2, 0, 3, 8], "texture": "#egg"},
+				"south": {"uv": [2, 0, 3, 8], "texture": "#egg"},
+				"west": {"uv": [2, 0, 3, 8], "texture": "#egg"},
+				"up": {"uv": [2, 0, 3, 1], "texture": "#egg"},
+				"down": {"uv": [2, 7, 3, 8], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_1",
+			"from": [5, 2, 7.5],
+			"to": [6, 16, 8.5],
+			"faces": {
+				"north": {"uv": [6, 0, 5, 14], "texture": "#egg"},
+				"east": {"uv": [5, 0, 6, 14], "texture": "#egg"},
+				"south": {"uv": [5, 0, 6, 14], "texture": "#egg"},
+				"west": {"uv": [5, 0, 6, 14], "texture": "#egg"},
+				"up": {"uv": [5, 0, 6, 1], "texture": "#egg"},
+				"down": {"uv": [5, 13, 6, 14], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_2",
+			"from": [7, 15, 7.5],
+			"to": [9, 16, 8.5],
+			"faces": {
+				"north": {"uv": [9, 0, 7, 1], "texture": "#egg"},
+				"east": {"uv": [8, 0, 9, 1], "texture": "#egg"},
+				"south": {"uv": [7, 0, 9, 1], "texture": "#egg"},
+				"west": {"uv": [7, 0, 8, 1], "texture": "#egg"},
+				"up": {"uv": [7, 0, 9, 1], "texture": "#egg"},
+				"down": {"uv": [7, 0, 9, 1], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_3",
+			"from": [13, 7, 7.5],
+			"to": [14, 16, 8.5],
+			"faces": {
+				"north": {"uv": [14, 0, 13, 9], "texture": "#egg"},
+				"east": {"uv": [13, 0, 14, 9], "texture": "#egg"},
+				"south": {"uv": [13, 0, 14, 9], "texture": "#egg"},
+				"west": {"uv": [13, 0, 14, 9], "texture": "#egg"},
+				"up": {"uv": [13, 0, 14, 1], "texture": "#egg"},
+				"down": {"uv": [13, 8, 14, 9], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_4",
+			"from": [1, 7, 7.5],
+			"to": [2, 15, 8.5],
+			"faces": {
+				"north": {"uv": [2, 1, 1, 9], "texture": "#egg"},
+				"east": {"uv": [1, 1, 2, 9], "texture": "#egg"},
+				"south": {"uv": [1, 1, 2, 9], "texture": "#egg"},
+				"west": {"uv": [1, 1, 2, 9], "texture": "#egg"},
+				"up": {"uv": [1, 1, 2, 2], "texture": "#egg"},
+				"down": {"uv": [1, 8, 2, 9], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_5",
+			"from": [3, 8, 7.5],
+			"to": [5, 15, 8.5],
+			"faces": {
+				"north": {"uv": [5, 1, 3, 8], "texture": "#egg"},
+				"east": {"uv": [4, 1, 5, 8], "texture": "#egg"},
+				"south": {"uv": [3, 1, 5, 8], "texture": "#egg"},
+				"west": {"uv": [3, 1, 4, 8], "texture": "#egg"},
+				"up": {"uv": [3, 1, 5, 2], "texture": "#egg"},
+				"down": {"uv": [3, 7, 5, 8], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_6",
+			"from": [6, 3, 7.5],
+			"to": [8, 15, 8.5],
+			"faces": {
+				"north": {"uv": [8, 1, 6, 13], "texture": "#egg"},
+				"east": {"uv": [7, 1, 8, 13], "texture": "#egg"},
+				"south": {"uv": [6, 1, 8, 13], "texture": "#egg"},
+				"west": {"uv": [6, 1, 7, 13], "texture": "#egg"},
+				"up": {"uv": [6, 1, 8, 2], "texture": "#egg"},
+				"down": {"uv": [6, 12, 8, 13], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_7",
+			"from": [11, 8, 7.5],
+			"to": [13, 15, 8.5],
+			"faces": {
+				"north": {"uv": [13, 1, 11, 8], "texture": "#egg"},
+				"east": {"uv": [12, 1, 13, 8], "texture": "#egg"},
+				"south": {"uv": [11, 1, 13, 8], "texture": "#egg"},
+				"west": {"uv": [11, 1, 12, 8], "texture": "#egg"},
+				"up": {"uv": [11, 1, 13, 2], "texture": "#egg"},
+				"down": {"uv": [11, 7, 13, 8], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_8",
+			"from": [14, 6, 7.5],
+			"to": [15, 15, 8.5],
+			"faces": {
+				"north": {"uv": [15, 1, 14, 10], "texture": "#egg"},
+				"east": {"uv": [14, 1, 15, 10], "texture": "#egg"},
+				"south": {"uv": [14, 1, 15, 10], "texture": "#egg"},
+				"west": {"uv": [14, 1, 15, 10], "texture": "#egg"},
+				"up": {"uv": [14, 1, 15, 2], "texture": "#egg"},
+				"down": {"uv": [14, 9, 15, 10], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_9",
+			"from": [0, 5, 7.5],
+			"to": [1, 14, 8.5],
+			"faces": {
+				"north": {"uv": [1, 2, 0, 11], "texture": "#egg"},
+				"east": {"uv": [0, 2, 1, 11], "texture": "#egg"},
+				"south": {"uv": [0, 2, 1, 11], "texture": "#egg"},
+				"west": {"uv": [0, 2, 1, 11], "texture": "#egg"},
+				"up": {"uv": [0, 2, 1, 3], "texture": "#egg"},
+				"down": {"uv": [0, 10, 1, 11], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_10",
+			"from": [8, 2, 7.5],
+			"to": [9, 14, 8.5],
+			"faces": {
+				"north": {"uv": [9, 2, 8, 14], "texture": "#egg"},
+				"east": {"uv": [8, 2, 9, 14], "texture": "#egg"},
+				"south": {"uv": [8, 2, 9, 14], "texture": "#egg"},
+				"west": {"uv": [8, 2, 9, 14], "texture": "#egg"},
+				"up": {"uv": [8, 2, 9, 3], "texture": "#egg"},
+				"down": {"uv": [8, 13, 9, 14], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_11",
+			"from": [10, 9, 7.5],
+			"to": [11, 14, 8.5],
+			"faces": {
+				"north": {"uv": [11, 2, 10, 7], "texture": "#egg"},
+				"east": {"uv": [10, 2, 11, 7], "texture": "#egg"},
+				"south": {"uv": [10, 2, 11, 7], "texture": "#egg"},
+				"west": {"uv": [10, 2, 11, 7], "texture": "#egg"},
+				"up": {"uv": [10, 2, 11, 3], "texture": "#egg"},
+				"down": {"uv": [10, 6, 11, 7], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_12",
+			"from": [15, 5, 7.5],
+			"to": [16, 14, 8.5],
+			"faces": {
+				"north": {"uv": [16, 2, 15, 11], "texture": "#egg"},
+				"east": {"uv": [15, 2, 16, 11], "texture": "#egg"},
+				"south": {"uv": [15, 2, 16, 11], "texture": "#egg"},
+				"west": {"uv": [15, 2, 16, 11], "texture": "#egg"},
+				"up": {"uv": [15, 2, 16, 3], "texture": "#egg"},
+				"down": {"uv": [15, 10, 16, 11], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_13",
+			"from": [9, 2, 7.5],
+			"to": [10, 13, 8.5],
+			"faces": {
+				"north": {"uv": [10, 3, 9, 14], "texture": "#egg"},
+				"east": {"uv": [9, 3, 10, 14], "texture": "#egg"},
+				"south": {"uv": [9, 3, 10, 14], "texture": "#egg"},
+				"west": {"uv": [9, 3, 10, 14], "texture": "#egg"},
+				"up": {"uv": [9, 3, 10, 4], "texture": "#egg"},
+				"down": {"uv": [9, 13, 10, 14], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_14",
+			"from": [4, 7, 7.5],
+			"to": [5, 8, 8.5],
+			"faces": {
+				"north": {"uv": [5, 8, 4, 9], "texture": "#egg"},
+				"east": {"uv": [4, 8, 5, 9], "texture": "#egg"},
+				"south": {"uv": [4, 8, 5, 9], "texture": "#egg"},
+				"west": {"uv": [4, 8, 5, 9], "texture": "#egg"},
+				"up": {"uv": [4, 8, 5, 9], "texture": "#egg"},
+				"down": {"uv": [4, 8, 5, 9], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_15",
+			"from": [12, 6, 7.5],
+			"to": [13, 8, 8.5],
+			"faces": {
+				"north": {"uv": [13, 8, 12, 10], "texture": "#egg"},
+				"east": {"uv": [12, 8, 13, 10], "texture": "#egg"},
+				"south": {"uv": [12, 8, 13, 10], "texture": "#egg"},
+				"west": {"uv": [12, 8, 13, 10], "texture": "#egg"},
+				"up": {"uv": [12, 8, 13, 9], "texture": "#egg"},
+				"down": {"uv": [12, 9, 13, 10], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_16",
+			"from": [10, 3, 7.5],
+			"to": [11, 6, 8.5],
+			"faces": {
+				"north": {"uv": [11, 10, 10, 13], "texture": "#egg"},
+				"east": {"uv": [10, 10, 11, 13], "texture": "#egg"},
+				"south": {"uv": [10, 10, 11, 13], "texture": "#egg"},
+				"west": {"uv": [10, 10, 11, 13], "texture": "#egg"},
+				"up": {"uv": [10, 10, 11, 11], "texture": "#egg"},
+				"down": {"uv": [10, 12, 11, 13], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_17",
+			"from": [4, 3, 7.5],
+			"to": [5, 5, 8.5],
+			"faces": {
+				"north": {"uv": [5, 11, 4, 13], "texture": "#egg"},
+				"east": {"uv": [4, 11, 5, 13], "texture": "#egg"},
+				"south": {"uv": [4, 11, 5, 13], "texture": "#egg"},
+				"west": {"uv": [4, 11, 5, 13], "texture": "#egg"},
+				"up": {"uv": [4, 11, 5, 12], "texture": "#egg"},
+				"down": {"uv": [4, 12, 5, 13], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_18",
+			"from": [11, 2, 7.5],
+			"to": [12, 5, 8.5],
+			"faces": {
+				"north": {"uv": [12, 11, 11, 14], "texture": "#egg"},
+				"east": {"uv": [11, 11, 12, 14], "texture": "#egg"},
+				"south": {"uv": [11, 11, 12, 14], "texture": "#egg"},
+				"west": {"uv": [11, 11, 12, 14], "texture": "#egg"},
+				"up": {"uv": [11, 11, 12, 12], "texture": "#egg"},
+				"down": {"uv": [11, 13, 12, 14], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_19",
+			"from": [13, 0, 7.5],
+			"to": [14, 5, 8.5],
+			"faces": {
+				"north": {"uv": [14, 11, 13, 16], "texture": "#egg"},
+				"east": {"uv": [13, 11, 14, 16], "texture": "#egg"},
+				"south": {"uv": [13, 11, 14, 16], "texture": "#egg"},
+				"west": {"uv": [13, 11, 14, 16], "texture": "#egg"},
+				"up": {"uv": [13, 11, 14, 12], "texture": "#egg"},
+				"down": {"uv": [13, 15, 14, 16], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_20",
+			"from": [12, 2, 7.5],
+			"to": [13, 4, 8.5],
+			"faces": {
+				"north": {"uv": [13, 12, 12, 14], "texture": "#egg"},
+				"east": {"uv": [12, 12, 13, 14], "texture": "#egg"},
+				"south": {"uv": [12, 12, 13, 14], "texture": "#egg"},
+				"west": {"uv": [12, 12, 13, 14], "texture": "#egg"},
+				"up": {"uv": [12, 12, 13, 13], "texture": "#egg"},
+				"down": {"uv": [12, 13, 13, 14], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_21",
+			"from": [14, 0, 7.5],
+			"to": [15, 4, 8.5],
+			"faces": {
+				"north": {"uv": [15, 12, 14, 16], "texture": "#egg"},
+				"east": {"uv": [14, 12, 15, 16], "texture": "#egg"},
+				"south": {"uv": [14, 12, 15, 16], "texture": "#egg"},
+				"west": {"uv": [14, 12, 15, 16], "texture": "#egg"},
+				"up": {"uv": [14, 12, 15, 13], "texture": "#egg"},
+				"down": {"uv": [14, 15, 15, 16], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_22",
+			"from": [6, 2, 7.5],
+			"to": [7, 3, 8.5],
+			"faces": {
+				"north": {"uv": [7, 13, 6, 14], "texture": "#egg"},
+				"east": {"uv": [6, 13, 7, 14], "texture": "#egg"},
+				"south": {"uv": [6, 13, 7, 14], "texture": "#egg"},
+				"west": {"uv": [6, 13, 7, 14], "texture": "#egg"},
+				"up": {"uv": [6, 13, 7, 14], "texture": "#egg"},
+				"down": {"uv": [6, 13, 7, 14], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_23",
+			"from": [15, 1, 7.5],
+			"to": [16, 3, 8.5],
+			"faces": {
+				"north": {"uv": [16, 13, 15, 15], "texture": "#egg"},
+				"east": {"uv": [15, 13, 16, 15], "texture": "#egg"},
+				"south": {"uv": [15, 13, 16, 15], "texture": "#egg"},
+				"west": {"uv": [15, 13, 16, 15], "texture": "#egg"},
+				"up": {"uv": [15, 13, 16, 14], "texture": "#egg"},
+				"down": {"uv": [15, 14, 16, 15], "texture": "#egg"}
+			}
+		},
+		{
+			"name": "ender_dragon_spawn_egg_24",
+			"from": [10, 0, 7.5],
+			"to": [13, 1, 8.5],
+			"faces": {
+				"north": {"uv": [13, 15, 10, 16], "texture": "#egg"},
+				"east": {"uv": [12, 15, 13, 16], "texture": "#egg"},
+				"south": {"uv": [10, 15, 13, 16], "texture": "#egg"},
+				"west": {"uv": [10, 15, 11, 16], "texture": "#egg"},
+				"up": {"uv": [10, 15, 13, 16], "texture": "#egg"},
+				"down": {"uv": [10, 15, 13, 16], "texture": "#egg"}
+			}
+		}
+	],
+	"gui_light": "front",
+	"display": {
+		"thirdperson_righthand": {
+			"translation": [0, 3, 1],
+			"scale": [0.55, 0.55, 0.55]
+		},
+		"firstperson_righthand": {
+			"rotation": [0, -90, 25],
+			"translation": [1.13, 3.2, 1.13],
+			"scale": [0.68, 0.68, 0.68]
+		},
+		"ground": {
+			"translation": [0, 2, 0],
+			"scale": [0.5, 0.5, 0.5]
+		},
+		"head": {
+			"rotation": [0, 180, 0],
+			"translation": [0, 13, 7]
+		},
+		"fixed": {
+			"rotation": [0, 180, 0]
+		}
+	},
+	"groups": [
+		{
+			"name": "ender_dragon_spawn_egg",
+			"origin": [8, 8, 8],
+			"color": 0,
+			"children": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
+		}
+	]
+}

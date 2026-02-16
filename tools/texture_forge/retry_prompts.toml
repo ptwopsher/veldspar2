@@ -1,0 +1,13 @@
+# Retry failed textures
+
+[[textures]]
+name = "granite"
+prompt = "Create a seamless tileable 16x16 pixel art texture of speckled granite rock surface. Hand-painted artistic style with visible mineral crystals. Colors: warm gray base, pink-gray patches, tiny white quartz flecks, small black mica spots scattered throughout. The texture must tile seamlessly in all directions. Output just the texture, no borders or labels."
+
+[[textures]]
+name = "loam"
+prompt = "Create a seamless tileable 16x16 pixel art texture showing rich brown garden soil. Painterly artistic style with tiny visible root fibers and small pebble details mixed in. Colors: dark chocolate brown, medium brown, tan highlights, tiny gray stone spots. The texture must tile seamlessly. Output just the texture, no borders or labels."
+
+[[textures]]
+name = "obsidian"
+prompt = "Create a seamless tileable 16x16 pixel art texture of polished volcanic obsidian glass rock. Painterly style with smooth glossy surface and subtle conchoidal fracture lines. Colors: very dark black-purple base, faint dark gray glassy streaks, subtle deep violet undertones. Must tile seamlessly. Output just the texture, no borders or labels."
