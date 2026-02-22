@@ -83,15 +83,76 @@ impl ChunkVertex {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum ChunkIndices {
+    U16(Vec<u16>),
+    U32(Vec<u32>),
+}
+
+impl Default for ChunkIndices {
+    fn default() -> Self {
+        Self::U32(Vec::new())
+    }
+}
+
+impl ChunkIndices {
+    pub fn index_count(&self) -> usize {
+        match self {
+            Self::U16(indices) => indices.len(),
+            Self::U32(indices) => indices.len(),
+        }
+    }
+
+    pub fn index_bytes(&self) -> u64 {
+        match self {
+            Self::U16(indices) => (indices.len() * std::mem::size_of::<u16>()) as u64,
+            Self::U32(indices) => (indices.len() * std::mem::size_of::<u32>()) as u64,
+        }
+    }
+
+    pub fn index_format(&self) -> wgpu::IndexFormat {
+        match self {
+            Self::U16(_) => wgpu::IndexFormat::Uint16,
+            Self::U32(_) => wgpu::IndexFormat::Uint32,
+        }
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        match self {
+            Self::U16(indices) => bytemuck::cast_slice(indices),
+            Self::U32(indices) => bytemuck::cast_slice(indices),
+        }
+    }
+
+    fn extend_u32(&mut self, indices: &[u32]) {
+        match self {
+            Self::U32(existing) => existing.extend_from_slice(indices),
+            Self::U16(_) => unreachable!("chunk indices were finalized before mesh construction ended"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct ChunkMesh {
     pub vertices: Vec<ChunkVertex>,
-    pub indices: Vec<u32>,
+    pub indices: ChunkIndices,
 }
 
 impl ChunkMesh {
     pub fn is_empty(&self) -> bool {
-        self.vertices.is_empty()
+        self.vertices.is_empty() || self.indices.index_count() == 0
+    }
+
+    fn finalize_indices(&mut self) {
+        let ChunkIndices::U32(indices) = std::mem::take(&mut self.indices) else {
+            return;
+        };
+
+        self.indices = if self.vertices.len() <= u16::MAX as usize {
+            ChunkIndices::U16(indices.into_iter().map(|i| i as u16).collect())
+        } else {
+            ChunkIndices::U32(indices)
+        };
     }
 }
 
@@ -171,6 +232,14 @@ const FACE_SPECS: [FaceSpec; 6] = [
     },
 ];
 
+fn chunk_world_offset(chunk_pos: ChunkPos) -> [f32; 3] {
+    [
+        (chunk_pos.x * CHUNK_SIZE as i32) as f32,
+        (chunk_pos.y * CHUNK_SIZE as i32) as f32,
+        (chunk_pos.z * CHUNK_SIZE as i32) as f32,
+    ]
+}
+
 pub fn build_chunk_meshes(
     chunk: &ChunkData,
     registry: &BlockRegistry,
@@ -183,20 +252,18 @@ pub fn build_chunk_meshes(
 ) -> ChunkMeshes {
     let mut opaque_mesh = ChunkMesh {
         vertices: Vec::with_capacity(8_192),
-        indices: Vec::with_capacity(12_288),
+        indices: ChunkIndices::U32(Vec::with_capacity(12_288)),
     };
     let mut water_mesh = ChunkMesh {
         vertices: Vec::with_capacity(2_048),
-        indices: Vec::with_capacity(3_072),
+        indices: ChunkIndices::U32(Vec::with_capacity(3_072)),
     };
-    let world_offset = [
-        (chunk_pos.x * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.y * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.z * CHUNK_SIZE as i32) as f32,
-    ];
+    let world_offset = chunk_world_offset(chunk_pos);
     let mut mask = vec![None::<BlockId>; MASK_SIZE];
     let mut ao_fingerprints = vec![0u8; MASK_SIZE];
     let mut light_levels = vec![15u8; MASK_SIZE];
+    let mut fluid_height_keys: [u32; MASK_SIZE] = [0; MASK_SIZE];
+    let mut fluid_flat_surfaces: [bool; MASK_SIZE] = [false; MASK_SIZE];
 
     let biome_perlin = Perlin::new(world_seed.wrapping_add(3) as u32);
     let humidity_perlin = Perlin::new(world_seed.wrapping_add(7) as u32);
@@ -330,6 +397,8 @@ pub fn build_chunk_meshes(
                 mask.fill(None);
                 ao_fingerprints.fill(0);
                 light_levels.fill(15);
+                fluid_height_keys.fill(0);
+                fluid_flat_surfaces.fill(false);
 
                 for v in 0..CHUNK_SIZE {
                     for u in 0..CHUNK_SIZE {
@@ -349,6 +418,19 @@ pub fn build_chunk_meshes(
                         {
                             let idx = v * CHUNK_SIZE + u;
                             mask[idx] = Some(block);
+                            if face.axis == 1 && face.sign == 1 {
+                                if let Some(level) = lava_level_from_block(block) {
+                                    let heights = fluid_top_corner_heights(
+                                        chunk,
+                                        neighbors,
+                                        block_coords,
+                                        true,
+                                        level,
+                                    );
+                                    fluid_height_keys[idx] = height_fingerprint(heights);
+                                    fluid_flat_surfaces[idx] = is_flat_fluid_surface(heights);
+                                }
+                            }
                             if lod_level == 0 {
                                 ao_fingerprints[idx] = compute_block_ao_fingerprint(
                                     chunk, registry, neighbors, face, slice, u, v,
@@ -369,27 +451,33 @@ pub fn build_chunk_meshes(
                         };
                         let ao_fingerprint = ao_fingerprints[idx];
                         let light_level = light_levels[idx];
-                        let is_fluid_face = true;
+                        let fluid_height_key = fluid_height_keys[idx];
+                        let can_merge = can_merge_fluid_top_face(face, fluid_flat_surfaces[idx]);
 
                         let mut width = 1usize;
-                        if !is_fluid_face {
+                        if can_merge {
                             while u + width < CHUNK_SIZE
                                 && mask[v * CHUNK_SIZE + (u + width)] == Some(block_id)
                                 && ao_fingerprints[v * CHUNK_SIZE + (u + width)] == ao_fingerprint
                                 && light_levels[v * CHUNK_SIZE + (u + width)] == light_level
+                                && fluid_flat_surfaces[v * CHUNK_SIZE + (u + width)]
+                                && fluid_height_keys[v * CHUNK_SIZE + (u + width)]
+                                    == fluid_height_key
                             {
                                 width += 1;
                             }
                         }
 
                         let mut height = 1usize;
-                        if !is_fluid_face {
+                        if can_merge {
                             'height: while v + height < CHUNK_SIZE {
                                 let row = (v + height) * CHUNK_SIZE;
                                 for du in 0..width {
                                     if mask[row + u + du] != Some(block_id)
                                         || ao_fingerprints[row + u + du] != ao_fingerprint
                                         || light_levels[row + u + du] != light_level
+                                        || !fluid_flat_surfaces[row + u + du]
+                                        || fluid_height_keys[row + u + du] != fluid_height_key
                                     {
                                         break 'height;
                                     }
@@ -424,6 +512,8 @@ pub fn build_chunk_meshes(
                                 mask[row + u + du] = None;
                                 ao_fingerprints[row + u + du] = 0;
                                 light_levels[row + u + du] = 15;
+                                fluid_height_keys[row + u + du] = 0;
+                                fluid_flat_surfaces[row + u + du] = false;
                             }
                         }
 
@@ -441,6 +531,7 @@ pub fn build_chunk_meshes(
                 mask.fill(None);
                 ao_fingerprints.fill(0);
                 light_levels.fill(15);
+                fluid_height_keys.fill(0);
 
                 for v in 0..CHUNK_SIZE {
                     for u in 0..CHUNK_SIZE {
@@ -461,6 +552,19 @@ pub fn build_chunk_meshes(
                         {
                             let idx = v * CHUNK_SIZE + u;
                             mask[idx] = Some(block);
+                            if face.axis == 1 && face.sign == 1 {
+                                if let Some(level) = water_level_from_block(block) {
+                                    let heights = fluid_top_corner_heights(
+                                        chunk,
+                                        neighbors,
+                                        block_coords,
+                                        false,
+                                        level,
+                                    );
+                                    fluid_height_keys[idx] = height_fingerprint(heights);
+                                    fluid_flat_surfaces[idx] = is_flat_fluid_surface(heights);
+                                }
+                            }
                             ao_fingerprints[idx] = compute_block_ao_fingerprint(
                                 chunk, registry, neighbors, face, slice, u, v,
                             );
@@ -479,27 +583,33 @@ pub fn build_chunk_meshes(
                         };
                         let ao_fingerprint = ao_fingerprints[idx];
                         let light_level = light_levels[idx];
-                        let is_fluid_face = true;
+                        let fluid_height_key = fluid_height_keys[idx];
+                        let can_merge = can_merge_fluid_top_face(face, fluid_flat_surfaces[idx]);
 
                         let mut width = 1usize;
-                        if !is_fluid_face {
+                        if can_merge {
                             while u + width < CHUNK_SIZE
                                 && mask[v * CHUNK_SIZE + (u + width)] == Some(block_id)
                                 && ao_fingerprints[v * CHUNK_SIZE + (u + width)] == ao_fingerprint
                                 && light_levels[v * CHUNK_SIZE + (u + width)] == light_level
+                                && fluid_flat_surfaces[v * CHUNK_SIZE + (u + width)]
+                                && fluid_height_keys[v * CHUNK_SIZE + (u + width)]
+                                    == fluid_height_key
                             {
                                 width += 1;
                             }
                         }
 
                         let mut height = 1usize;
-                        if !is_fluid_face {
+                        if can_merge {
                             'height: while v + height < CHUNK_SIZE {
                                 let row = (v + height) * CHUNK_SIZE;
                                 for du in 0..width {
                                     if mask[row + u + du] != Some(block_id)
                                         || ao_fingerprints[row + u + du] != ao_fingerprint
                                         || light_levels[row + u + du] != light_level
+                                        || !fluid_flat_surfaces[row + u + du]
+                                        || fluid_height_keys[row + u + du] != fluid_height_key
                                     {
                                         break 'height;
                                     }
@@ -534,6 +644,8 @@ pub fn build_chunk_meshes(
                                 mask[row + u + du] = None;
                                 ao_fingerprints[row + u + du] = 0;
                                 light_levels[row + u + du] = 15;
+                                fluid_height_keys[row + u + du] = 0;
+                                fluid_flat_surfaces[row + u + du] = false;
                             }
                         }
 
@@ -587,6 +699,9 @@ pub fn build_chunk_meshes(
         );
         append_glass_pane_mesh(&mut water_mesh, chunk, light_map, chunk_pos);
     }
+
+    opaque_mesh.finalize_indices();
+    water_mesh.finalize_indices();
 
     ChunkMeshes {
         opaque: opaque_mesh,
@@ -915,6 +1030,30 @@ fn fluid_top_corner_heights(
     heights
 }
 
+fn height_fingerprint(heights: [f32; 4]) -> u32 {
+    let q0 = u32::from(quantize_fluid_corner_height(heights[0]));
+    let q1 = u32::from(quantize_fluid_corner_height(heights[1]));
+    let q2 = u32::from(quantize_fluid_corner_height(heights[2]));
+    let q3 = u32::from(quantize_fluid_corner_height(heights[3]));
+    q0 | (q1 << 5) | (q2 << 10) | (q3 << 15)
+}
+
+fn quantize_fluid_corner_height(height: f32) -> u8 {
+    (height.clamp(0.0, 1.0) * 16.0).round() as u8
+}
+
+fn is_flat_fluid_surface(heights: [f32; 4]) -> bool {
+    let q0 = quantize_fluid_corner_height(heights[0]);
+    let q1 = quantize_fluid_corner_height(heights[1]);
+    let q2 = quantize_fluid_corner_height(heights[2]);
+    let q3 = quantize_fluid_corner_height(heights[3]);
+    q0 == q1 && q1 == q2 && q2 == q3
+}
+
+fn can_merge_fluid_top_face(face: FaceSpec, is_flat_surface: bool) -> bool {
+    face.axis == 1 && face.sign == 1 && is_flat_surface
+}
+
 fn append_torch_mesh(
     mesh: &mut ChunkMesh,
     chunk: &ChunkData,
@@ -922,11 +1061,7 @@ fn append_torch_mesh(
     chunk_pos: ChunkPos,
     torch_id: BlockId,
 ) {
-    let world_offset = [
-        (chunk_pos.x * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.y * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.z * CHUNK_SIZE as i32) as f32,
-    ];
+    let world_offset = chunk_world_offset(chunk_pos);
     let stick_tile = tile_origin_for_block(TORCH_STICK_TILE_BLOCK_ID);
     let flame_tile = tile_origin_for_block(TORCH_FLAME_TILE_BLOCK_ID);
 
@@ -997,11 +1132,7 @@ fn append_multiface_block_mesh(
     light_map: Option<&LightMap>,
     chunk_pos: ChunkPos,
 ) {
-    let world_offset = [
-        (chunk_pos.x * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.y * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.z * CHUNK_SIZE as i32) as f32,
-    ];
+    let world_offset = chunk_world_offset(chunk_pos);
 
     let log_side = tile_origin_for_block(OAK_LOG_SIDE_TILE_BLOCK_ID);
     let log_top = tile_origin_for_block(OAK_LOG_TOP_TILE_BLOCK_ID);
@@ -1125,11 +1256,7 @@ fn append_door_mesh(
     light_map: Option<&LightMap>,
     chunk_pos: ChunkPos,
 ) {
-    let world_offset = [
-        (chunk_pos.x * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.y * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.z * CHUNK_SIZE as i32) as f32,
-    ];
+    let world_offset = chunk_world_offset(chunk_pos);
 
     for y in 0..CHUNK_SIZE {
         for z in 0..CHUNK_SIZE {
@@ -1173,11 +1300,7 @@ fn append_ladder_mesh(
     light_map: Option<&LightMap>,
     chunk_pos: ChunkPos,
 ) {
-    let world_offset = [
-        (chunk_pos.x * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.y * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.z * CHUNK_SIZE as i32) as f32,
-    ];
+    let world_offset = chunk_world_offset(chunk_pos);
 
     for y in 0..CHUNK_SIZE {
         for z in 0..CHUNK_SIZE {
@@ -1257,11 +1380,7 @@ fn append_vine_mesh(
     light_map: Option<&LightMap>,
     chunk_pos: ChunkPos,
 ) {
-    let world_offset = [
-        (chunk_pos.x * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.y * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.z * CHUNK_SIZE as i32) as f32,
-    ];
+    let world_offset = chunk_world_offset(chunk_pos);
 
     for y in 0..CHUNK_SIZE {
         for z in 0..CHUNK_SIZE {
@@ -1342,11 +1461,7 @@ fn append_fence_mesh(
     light_map: Option<&LightMap>,
     chunk_pos: ChunkPos,
 ) {
-    let world_offset = [
-        (chunk_pos.x * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.y * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.z * CHUNK_SIZE as i32) as f32,
-    ];
+    let world_offset = chunk_world_offset(chunk_pos);
     let tile_origin = tile_origin_for_block(BlockId::FENCE);
 
     for y in 0..CHUNK_SIZE {
@@ -1445,11 +1560,7 @@ fn append_trapdoor_mesh(
     light_map: Option<&LightMap>,
     chunk_pos: ChunkPos,
 ) {
-    let world_offset = [
-        (chunk_pos.x * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.y * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.z * CHUNK_SIZE as i32) as f32,
-    ];
+    let world_offset = chunk_world_offset(chunk_pos);
     let tile_origin = tile_origin_for_block(BlockId::TRAPDOOR_CLOSED);
 
     for y in 0..CHUNK_SIZE {
@@ -1465,34 +1576,32 @@ fn append_trapdoor_mesh(
                 let by = world_offset[1] + y as f32;
                 let bz = world_offset[2] + z as f32;
 
-                // Determine if open or closed based on block ID
-                let is_open = matches!(block, b if b == BlockId::TRAPDOOR_OPEN || b == BlockId::TRAPDOOR_OPEN_EAST || b == BlockId::TRAPDOOR_OPEN_SOUTH || b == BlockId::TRAPDOOR_OPEN_WEST);
-
-                if is_open {
-                    // Open: vertical thin slab on one side
-                    let facing = if block == BlockId::TRAPDOOR_OPEN { 0 }
-                        else if block == BlockId::TRAPDOOR_OPEN_EAST { 1 }
-                        else if block == BlockId::TRAPDOOR_OPEN_SOUTH { 2 }
-                        else { 3 };
-                    let thickness = 0.1875_f32;
-                    let (min, max) = match facing {
-                        0 => ([bx, by, bz], [bx + 1.0, by + 1.0, bz + thickness]),           // North
-                        1 => ([bx + 1.0 - thickness, by, bz], [bx + 1.0, by + 1.0, bz + 1.0]), // East
-                        2 => ([bx, by, bz + 1.0 - thickness], [bx + 1.0, by + 1.0, bz + 1.0]), // South
-                        _ => ([bx, by, bz], [bx + thickness, by + 1.0, bz + 1.0]),            // West
-                    };
-                    emit_box(mesh, light_map, [x as i32, y as i32, z as i32], min, max, tile_origin, false);
-                } else {
-                    // Closed: horizontal thin slab at bottom
-                    let thickness = 0.1875_f32;
-                    emit_box(
-                        mesh, light_map,
-                        [x as i32, y as i32, z as i32],
-                        [bx, by, bz],
-                        [bx + 1.0, by + thickness, bz + 1.0],
-                        tile_origin, false,
-                    );
-                }
+                let thickness = 0.1875_f32;
+                let open_bounds = match block {
+                    BlockId::TRAPDOOR_OPEN => Some(([bx, by, bz], [bx + 1.0, by + 1.0, bz + thickness])),
+                    BlockId::TRAPDOOR_OPEN_EAST => Some((
+                        [bx + 1.0 - thickness, by, bz],
+                        [bx + 1.0, by + 1.0, bz + 1.0],
+                    )),
+                    BlockId::TRAPDOOR_OPEN_SOUTH => Some((
+                        [bx, by, bz + 1.0 - thickness],
+                        [bx + 1.0, by + 1.0, bz + 1.0],
+                    )),
+                    BlockId::TRAPDOOR_OPEN_WEST => {
+                        Some(([bx, by, bz], [bx + thickness, by + 1.0, bz + 1.0]))
+                    }
+                    _ => None,
+                };
+                let (min, max) = open_bounds.unwrap_or(([bx, by, bz], [bx + 1.0, by + thickness, bz + 1.0]));
+                emit_box(
+                    mesh,
+                    light_map,
+                    [x as i32, y as i32, z as i32],
+                    min,
+                    max,
+                    tile_origin,
+                    false,
+                );
             }
         }
     }
@@ -1504,11 +1613,7 @@ fn append_bed_mesh(
     light_map: Option<&LightMap>,
     chunk_pos: ChunkPos,
 ) {
-    let world_offset = [
-        (chunk_pos.x * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.y * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.z * CHUNK_SIZE as i32) as f32,
-    ];
+    let world_offset = chunk_world_offset(chunk_pos);
 
     for y in 0..CHUNK_SIZE {
         for z in 0..CHUNK_SIZE {
@@ -1519,7 +1624,13 @@ fn append_bed_mesh(
                     continue;
                 }
 
-                let is_head = matches!(block, b if b == BlockId::BED_HEAD || b == BlockId::BED_HEAD_EAST || b == BlockId::BED_HEAD_SOUTH || b == BlockId::BED_HEAD_WEST);
+                let is_head = matches!(
+                    block,
+                    BlockId::BED_HEAD
+                        | BlockId::BED_HEAD_EAST
+                        | BlockId::BED_HEAD_SOUTH
+                        | BlockId::BED_HEAD_WEST
+                );
                 let tile_origin = if is_head {
                     tile_origin_for_block(BlockId::BED_HEAD)
                 } else {
@@ -1549,11 +1660,7 @@ fn append_pressure_plate_mesh(
     light_map: Option<&LightMap>,
     chunk_pos: ChunkPos,
 ) {
-    let world_offset = [
-        (chunk_pos.x * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.y * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.z * CHUNK_SIZE as i32) as f32,
-    ];
+    let world_offset = chunk_world_offset(chunk_pos);
     let tile_origin = tile_origin_for_block(BlockId::STONE_PRESSURE_PLATE);
 
     for y in 0..CHUNK_SIZE {
@@ -1588,11 +1695,7 @@ fn append_carpet_mesh(
     light_map: Option<&LightMap>,
     chunk_pos: ChunkPos,
 ) {
-    let world_offset = [
-        (chunk_pos.x * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.y * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.z * CHUNK_SIZE as i32) as f32,
-    ];
+    let world_offset = chunk_world_offset(chunk_pos);
 
     for y in 0..CHUNK_SIZE {
         for z in 0..CHUNK_SIZE {
@@ -1628,11 +1731,7 @@ fn append_slab_mesh(
     light_map: Option<&LightMap>,
     chunk_pos: ChunkPos,
 ) {
-    let world_offset = [
-        (chunk_pos.x * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.y * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.z * CHUNK_SIZE as i32) as f32,
-    ];
+    let world_offset = chunk_world_offset(chunk_pos);
 
     for y in 0..CHUNK_SIZE {
         for z in 0..CHUNK_SIZE {
@@ -1678,11 +1777,7 @@ fn append_cactus_mesh(
     light_map: Option<&LightMap>,
     chunk_pos: ChunkPos,
 ) {
-    let world_offset = [
-        (chunk_pos.x * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.y * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.z * CHUNK_SIZE as i32) as f32,
-    ];
+    let world_offset = chunk_world_offset(chunk_pos);
 
     for y in 0..CHUNK_SIZE {
         for z in 0..CHUNK_SIZE {
@@ -1721,11 +1816,7 @@ fn append_cross_plant_mesh(
     biome_noise: &Perlin,
     humidity_noise: &Perlin,
 ) {
-    let world_offset = [
-        (chunk_pos.x * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.y * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.z * CHUNK_SIZE as i32) as f32,
-    ];
+    let world_offset = chunk_world_offset(chunk_pos);
 
     for y in 0..CHUNK_SIZE {
         for z in 0..CHUNK_SIZE {
@@ -1783,13 +1874,7 @@ fn append_glass_pane_mesh(
     light_map: Option<&LightMap>,
     chunk_pos: ChunkPos,
 ) {
-    let world_offset = [
-        (chunk_pos.x * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.y * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.z * CHUNK_SIZE as i32) as f32,
-    ];
-    let tex_coords = [[0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]];
-    let ao_values = [1.0; 4];
+    let world_offset = chunk_world_offset(chunk_pos);
 
     for y in 0..CHUNK_SIZE {
         for z in 0..CHUNK_SIZE {
@@ -1817,54 +1902,13 @@ fn append_glass_pane_mesh(
                 let y1 = y0 + 1.0;
                 let z0 = world_offset[2] + z as f32;
                 let z1 = z0 + 1.0;
-                let tint = [1.0, 1.0, 1.0];
-
-                let diag_a = [[x0, y0, z0], [x1, y0, z1], [x1, y1, z1], [x0, y1, z0]];
-                push_quad(
+                emit_cross_mesh(
                     mesh,
-                    diag_a,
-                    [0.707, 0.0, -0.707],
-                    tex_coords,
-                    ao_values,
+                    [x0, y0, z0],
+                    [x1, y1, z1],
                     light_values,
                     tile_origin,
-                    tint,
-                    false,
-                );
-                push_quad(
-                    mesh,
-                    diag_a,
-                    [-0.707, 0.0, 0.707],
-                    tex_coords,
-                    ao_values,
-                    light_values,
-                    tile_origin,
-                    tint,
-                    true,
-                );
-
-                let diag_b = [[x1, y0, z0], [x0, y0, z1], [x0, y1, z1], [x1, y1, z0]];
-                push_quad(
-                    mesh,
-                    diag_b,
-                    [-0.707, 0.0, -0.707],
-                    tex_coords,
-                    ao_values,
-                    light_values,
-                    tile_origin,
-                    tint,
-                    false,
-                );
-                push_quad(
-                    mesh,
-                    diag_b,
-                    [0.707, 0.0, 0.707],
-                    tex_coords,
-                    ao_values,
-                    light_values,
-                    tile_origin,
-                    tint,
-                    true,
+                    [1.0, 1.0, 1.0],
                 );
             }
         }
@@ -1877,11 +1921,7 @@ fn append_stairs_mesh(
     light_map: Option<&LightMap>,
     chunk_pos: ChunkPos,
 ) {
-    let world_offset = [
-        (chunk_pos.x * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.y * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.z * CHUNK_SIZE as i32) as f32,
-    ];
+    let world_offset = chunk_world_offset(chunk_pos);
 
     for y in 0..CHUNK_SIZE {
         for z in 0..CHUNK_SIZE {
@@ -1921,13 +1961,7 @@ fn append_lever_mesh(
     light_map: Option<&LightMap>,
     chunk_pos: ChunkPos,
 ) {
-    let world_offset = [
-        (chunk_pos.x * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.y * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.z * CHUNK_SIZE as i32) as f32,
-    ];
-    let tex_coords = [[0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]];
-    let ao_values = [1.0; 4];
+    let world_offset = chunk_world_offset(chunk_pos);
 
     for y in 0..CHUNK_SIZE {
         for z in 0..CHUNK_SIZE {
@@ -1958,53 +1992,13 @@ fn append_lever_mesh(
                 let y1 = cy + LEVER_HEIGHT;
                 let z0 = cz - LEVER_HALF_EXTENT;
                 let z1 = cz + LEVER_HALF_EXTENT;
-
-                let diag_a = [[x0, y0, z0], [x1, y0, z1], [x1, y1, z1], [x0, y1, z0]];
-                push_quad(
+                emit_cross_mesh(
                     mesh,
-                    diag_a,
-                    [0.707, 0.0, -0.707],
-                    tex_coords,
-                    ao_values,
+                    [x0, y0, z0],
+                    [x1, y1, z1],
                     light_values,
                     tile_origin,
                     tint,
-                    false,
-                );
-                push_quad(
-                    mesh,
-                    diag_a,
-                    [-0.707, 0.0, 0.707],
-                    tex_coords,
-                    ao_values,
-                    light_values,
-                    tile_origin,
-                    tint,
-                    true,
-                );
-
-                let diag_b = [[x1, y0, z0], [x0, y0, z1], [x0, y1, z1], [x1, y1, z0]];
-                push_quad(
-                    mesh,
-                    diag_b,
-                    [-0.707, 0.0, -0.707],
-                    tex_coords,
-                    ao_values,
-                    light_values,
-                    tile_origin,
-                    tint,
-                    false,
-                );
-                push_quad(
-                    mesh,
-                    diag_b,
-                    [0.707, 0.0, 0.707],
-                    tex_coords,
-                    ao_values,
-                    light_values,
-                    tile_origin,
-                    tint,
-                    true,
                 );
             }
         }
@@ -2017,11 +2011,7 @@ fn append_button_mesh(
     light_map: Option<&LightMap>,
     chunk_pos: ChunkPos,
 ) {
-    let world_offset = [
-        (chunk_pos.x * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.y * CHUNK_SIZE as i32) as f32,
-        (chunk_pos.z * CHUNK_SIZE as i32) as f32,
-    ];
+    let world_offset = chunk_world_offset(chunk_pos);
 
     for y in 0..CHUNK_SIZE {
         for z in 0..CHUNK_SIZE {
@@ -2571,7 +2561,7 @@ fn push_quad_lit(
             base_index + 3,
         ]
     };
-    mesh.indices.extend_from_slice(&indices);
+    mesh.indices.extend_u32(&indices);
 }
 
 fn compute_quad_ao(
@@ -2846,5 +2836,48 @@ fn wrap_to_local(value: i32) -> i32 {
         value - CHUNK_SIZE_I32
     } else {
         value
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        can_merge_fluid_top_face, height_fingerprint, is_flat_fluid_surface,
+        quantize_fluid_corner_height, FACE_SPECS,
+    };
+
+    #[test]
+    fn quantize_fluid_corner_height_clamps_and_steps() {
+        assert_eq!(quantize_fluid_corner_height(-1.0), 0);
+        assert_eq!(quantize_fluid_corner_height(0.0), 0);
+        assert_eq!(quantize_fluid_corner_height(0.5), 8);
+        assert_eq!(quantize_fluid_corner_height(1.0), 16);
+        assert_eq!(quantize_fluid_corner_height(2.0), 16);
+    }
+
+    #[test]
+    fn flat_surface_detection_uses_quantized_corners() {
+        assert!(is_flat_fluid_surface([0.75, 0.75, 0.75, 0.75]));
+        assert!(is_flat_fluid_surface([0.7501, 0.7499, 0.75, 0.75]));
+        assert!(!is_flat_fluid_surface([0.75, 0.75, 0.625, 0.75]));
+    }
+
+    #[test]
+    fn height_fingerprint_changes_when_corner_profile_changes() {
+        let a = height_fingerprint([1.0, 1.0, 1.0, 1.0]);
+        let b = height_fingerprint([1.0, 1.0, 0.875, 1.0]);
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn can_merge_only_on_positive_y_flat_faces() {
+        let top_face = FACE_SPECS[2];
+        let bottom_face = FACE_SPECS[3];
+        let side_face = FACE_SPECS[0];
+
+        assert!(can_merge_fluid_top_face(top_face, true));
+        assert!(!can_merge_fluid_top_face(top_face, false));
+        assert!(!can_merge_fluid_top_face(bottom_face, true));
+        assert!(!can_merge_fluid_top_face(side_face, true));
     }
 }

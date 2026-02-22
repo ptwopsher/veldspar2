@@ -6,6 +6,10 @@ struct CameraUniform {
     fog_end: f32,
     time_of_day: f32,
     underwater: f32,
+    render_time_seconds: f32,
+    _padding0: f32,
+    _padding1: f32,
+    _padding2: f32,
 };
 
 @group(0) @binding(0)
@@ -17,12 +21,16 @@ var atlas_texture: texture_2d<f32>;
 var atlas_sampler: sampler;
 
 struct ChunkParams {
-    fade: f32,
+    spawn_time: f32,
+    _padding0: f32,
+    _padding1: f32,
+    _padding2: f32,
 };
 @group(2) @binding(0)
 var<uniform> chunk_params: ChunkParams;
 
 const TILE_SIZE_UV: f32 = 0.03125; // 16.0 / 512.0
+const CHUNK_FADE_DURATION_SECS: f32 = 0.4;
 
 struct VertexIn {
     @location(0) position: vec3<f32>,
@@ -116,10 +124,13 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
     let fog_start = mix(camera.fog_start, 0.0, underwater_factor);
     let fog_end = mix(camera.fog_end, 48.0, underwater_factor);
     let fog_range = max(fog_end - fog_start, 0.001);
-    let fog_factor = clamp((fog_end - dist) / fog_range, 0.0, 1.0);
+    var fog_factor = clamp((fog_end - dist) / fog_range, 0.0, 1.0);
+    if (fog_end <= fog_start + 0.01) {
+        fog_factor = 1.0;
+    }
 
-    // Chunk fade-in
-    let visibility = fog_factor * chunk_params.fade;
+    // Keep chunks fully visible even if chunk fade timing data is out of sync.
+    let visibility = fog_factor;
     let lava_pulse = 1.0 + 0.12 * sin(flow_time * 0.08 + input.world_position.x * 0.4 + input.world_position.z * 0.4);
     let base_light_factor = light * light_scale;
     let local_light_factor = block_light * (0.72 + 0.28 * night_factor);

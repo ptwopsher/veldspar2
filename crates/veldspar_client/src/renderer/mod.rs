@@ -4,7 +4,6 @@ pub mod clouds;
 pub mod item_drop_renderer;
 pub mod mesh;
 
-use std::collections::HashMap;
 pub mod particles;
 pub mod pipeline;
 pub mod player_renderer;
@@ -18,6 +17,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use bytemuck::{Pod, Zeroable};
+use rustc_hash::FxHashMap;
 use wgpu::util::DeviceExt;
 use veldspar_shared::block::BlockRegistry;
 use veldspar_shared::coords::ChunkPos;
@@ -27,10 +27,15 @@ use winit::window::Window;
 use crate::camera::Camera;
 use crate::renderer::atlas::{build_atlas, AtlasBuildError, AtlasMapping};
 use crate::renderer::chunk_renderer::{
+    collect_visible_transparent_chunks,
+    extract_frustum_planes,
     render_chunks,
-    render_chunks_transparent,
+    render_visible_transparent_chunks,
+    update_mesh_buffers,
     upload_mesh,
+    ChunkPassStats,
     ChunkRenderData,
+    MeshUploadStats,
 };
 use crate::renderer::clouds::CloudRenderer;
 use crate::renderer::item_drop_renderer::{ItemDropRenderData, ItemDropRenderer};
@@ -49,7 +54,6 @@ use crate::ui::main_menu::{MainMenuRenderer, SettingsMenuView, WorldSelectView};
 use crate::ui::text_overlay::TextOverlayRenderer;
 
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
-const FADE_DURATION: f32 = 0.4;
 const WEATHER_DARKEN_STRENGTH: f32 = 0.3;
 
 #[repr(C)]
@@ -62,6 +66,8 @@ struct CameraUniform {
     fog_end: f32,
     time_of_day: f32,
     underwater: f32,
+    render_time_seconds: f32,
+    _padding: [f32; 3],
 }
 
 impl CameraUniform {
@@ -71,6 +77,7 @@ impl CameraUniform {
         fog_end: f32,
         time_of_day: f32,
         underwater: bool,
+        render_time_seconds: f32,
         weather_dim: f32,
     ) -> Self {
         let mut fog_color = sky_horizon_color(time_of_day);
@@ -87,8 +94,19 @@ impl CameraUniform {
             fog_end,
             time_of_day,
             underwater: if underwater { 1.0 } else { 0.0 },
+            render_time_seconds,
+            _padding: [0.0; 3],
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct RenderFrameStats {
+    pub opaque_draw_calls: u32,
+    pub water_draw_calls: u32,
+    pub rendered_chunks: u32,
+    pub rendered_indices: u64,
+    pub rendered_vertices: u64,
 }
 
 #[derive(Debug)]
@@ -134,8 +152,9 @@ pub struct Renderer {
     atlas_bind_group: wgpu::BindGroup,
     _atlas_texture: wgpu::Texture,
     atlas_mapping: AtlasMapping,
-    chunk_meshes: HashMap<ChunkPos, ChunkRenderData>,
-    water_meshes: HashMap<ChunkPos, ChunkRenderData>,
+    chunk_meshes: FxHashMap<ChunkPos, ChunkRenderData>,
+    water_meshes: FxHashMap<ChunkPos, ChunkRenderData>,
+    visible_transparent: Vec<(ChunkPos, f32)>,
     sky_renderer: SkyRenderer,
     cloud_renderer: CloudRenderer,
     particle_renderer: ParticleRenderer,
@@ -151,6 +170,7 @@ pub struct Renderer {
     view_proj: Cell<glam::Mat4>,
     camera_pos: Cell<glam::Vec3>,
     crosshair_visible: bool,
+    last_frame_stats: RenderFrameStats,
 }
 
 #[derive(Debug)]
@@ -223,20 +243,13 @@ impl Renderer {
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../Excalibur_V1/assets/minecraft/textures/block");
         let (atlas_texture, atlas_view, atlas_sampler, atlas_mapping) =
             build_atlas(&device, &queue, &atlas_dir).map_err(RendererInitError::BuildAtlas)?;
-        let atlas_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Chunk Atlas Bind Group"),
-            layout: &chunk_pipeline.texture_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&atlas_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&atlas_sampler),
-                },
-            ],
-        });
+        let atlas_bind_group = create_texture_bind_group(
+            &device,
+            &chunk_pipeline.texture_bind_group_layout,
+            &atlas_view,
+            &atlas_sampler,
+            "Chunk Atlas Bind Group",
+        );
 
         let initial_camera_uniform = CameraUniform {
             view_proj: glam::Mat4::IDENTITY.to_cols_array_2d(),
@@ -246,6 +259,8 @@ impl Renderer {
             fog_end: 1.0,
             time_of_day: 0.5,
             underwater: 0.0,
+            render_time_seconds: 0.0,
+            _padding: [0.0; 3],
         };
         let camera_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Chunk Camera Uniform Buffer"),
@@ -275,20 +290,13 @@ impl Renderer {
             DEPTH_FORMAT,
             &chunk_pipeline.camera_bind_group_layout,
             &chunk_pipeline.texture_bind_group_layout,
-            device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("Item Drop Atlas Bind Group"),
-                layout: &chunk_pipeline.texture_bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&atlas_view),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&atlas_sampler),
-                    },
-                ],
-            }),
+            create_texture_bind_group(
+                &device,
+                &chunk_pipeline.texture_bind_group_layout,
+                &atlas_view,
+                &atlas_sampler,
+                "Item Drop Atlas Bind Group",
+            ),
         );
         let crosshair_renderer = CrosshairRenderer::new(
             &device,
@@ -312,20 +320,13 @@ impl Renderer {
             &device,
             surface_config.format,
             &chunk_pipeline.texture_bind_group_layout,
-            device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("Inventory Atlas Bind Group"),
-                layout: &chunk_pipeline.texture_bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&atlas_view),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&atlas_sampler),
-                    },
-                ],
-            }),
+            create_texture_bind_group(
+                &device,
+                &chunk_pipeline.texture_bind_group_layout,
+                &atlas_view,
+                &atlas_sampler,
+                "Inventory Atlas Bind Group",
+            ),
             atlas_mapping.clone(),
         );
         let health_hud_renderer = HealthHudRenderer::new(&device, surface_config.format);
@@ -358,8 +359,9 @@ impl Renderer {
             atlas_bind_group,
             _atlas_texture: atlas_texture,
             atlas_mapping,
-            chunk_meshes: HashMap::new(),
-            water_meshes: HashMap::new(),
+            chunk_meshes: FxHashMap::default(),
+            water_meshes: FxHashMap::default(),
+            visible_transparent: Vec::new(),
             sky_renderer,
             cloud_renderer,
             particle_renderer,
@@ -375,6 +377,7 @@ impl Renderer {
             view_proj: Cell::new(glam::Mat4::IDENTITY),
             camera_pos: Cell::new(glam::Vec3::ZERO),
             crosshair_visible: true,
+            last_frame_stats: RenderFrameStats::default(),
         })
     }
 
@@ -394,6 +397,24 @@ impl Renderer {
         &self.atlas_mapping
     }
 
+    pub fn last_frame_stats(&self) -> RenderFrameStats {
+        self.last_frame_stats
+    }
+
+    pub fn reserve_chunk_mesh_capacity(&mut self, loaded_chunks: usize) {
+        let target = loaded_chunks.max(64);
+        if self.chunk_meshes.capacity() < target {
+            self.chunk_meshes.reserve(target - self.chunk_meshes.capacity());
+        }
+        if self.water_meshes.capacity() < target {
+            self.water_meshes.reserve(target - self.water_meshes.capacity());
+        }
+        if self.visible_transparent.capacity() < target {
+            self.visible_transparent
+                .reserve(target - self.visible_transparent.capacity());
+        }
+    }
+
     pub fn update_camera_uniform(
         &self,
         camera: &Camera,
@@ -401,6 +422,7 @@ impl Renderer {
         fog_end: f32,
         time_of_day: f32,
         underwater: bool,
+        render_time_seconds: f32,
         weather_dim: f32,
     ) {
         let uniform = CameraUniform::from_camera(
@@ -409,6 +431,7 @@ impl Renderer {
             fog_end,
             time_of_day,
             underwater,
+            render_time_seconds,
             weather_dim,
         );
         self.queue
@@ -458,32 +481,18 @@ impl Renderer {
         self.particle_renderer.spawn_snow_particles(spawn_positions);
     }
 
-    pub fn advance_fades(&mut self, dt: f32) {
-        let queue = &self.queue;
-        for chunk in self.chunk_meshes.values_mut() {
-            if chunk.fade < 1.0 {
-                chunk.fade = (chunk.fade + dt / FADE_DURATION).min(1.0);
-                queue.write_buffer(&chunk.fade_buffer, 0, bytemuck::bytes_of(&chunk.fade));
-            }
-        }
-        for chunk in self.water_meshes.values_mut() {
-            if chunk.fade < 1.0 {
-                chunk.fade = (chunk.fade + dt / FADE_DURATION).min(1.0);
-                queue.write_buffer(&chunk.fade_buffer, 0, bytemuck::bytes_of(&chunk.fade));
-            }
-        }
-    }
-
     pub fn upload_chunk_mesh(&mut self, mesh: &ChunkMesh, chunk_pos: ChunkPos) {
         if mesh.is_empty() {
             return;
         }
 
-        let data = upload_mesh(
+        let (data, _) = upload_mesh(
             &self.device,
+            &self.queue,
             mesh,
             chunk_pos,
             &self.chunk_pipeline.chunk_params_bind_group_layout,
+            0.0,
         );
         self.chunk_meshes.insert(chunk_pos, data);
     }
@@ -495,44 +504,40 @@ impl Renderer {
         self.item_drop_renderer.clear();
     }
 
-    pub fn replace_chunk_mesh(&mut self, meshes: &ChunkMeshes, chunk_pos: ChunkPos) {
-        // Preserve fade for existing chunks (remeshing should not re-trigger fade-in)
-        let existing_opaque_fade = self.chunk_meshes.get(&chunk_pos).map(|c| c.fade);
-        let existing_water_fade = self.water_meshes.get(&chunk_pos).map(|c| c.fade);
+    pub fn replace_chunk_mesh(
+        &mut self,
+        meshes: &ChunkMeshes,
+        chunk_pos: ChunkPos,
+        spawn_time_seconds: f32,
+    ) -> MeshUploadStats {
+        let mut stats = MeshUploadStats::default();
 
-        if !meshes.opaque.is_empty() {
-            let mut data = upload_mesh(
+        accumulate_upload_stats(
+            &mut stats,
+            replace_render_mesh(
                 &self.device,
+                &self.queue,
+                &self.chunk_pipeline.chunk_params_bind_group_layout,
+                &mut self.chunk_meshes,
+                chunk_pos,
                 &meshes.opaque,
-                chunk_pos,
-                &self.chunk_pipeline.chunk_params_bind_group_layout,
-            );
-            if let Some(fade) = existing_opaque_fade {
-                data.fade = fade;
-                self.queue
-                    .write_buffer(&data.fade_buffer, 0, bytemuck::bytes_of(&data.fade));
-            }
-            self.chunk_meshes.insert(chunk_pos, data);
-        } else {
-            self.chunk_meshes.remove(&chunk_pos);
-        }
-
-        if !meshes.water.is_empty() {
-            let mut data = upload_mesh(
+                spawn_time_seconds,
+            ),
+        );
+        accumulate_upload_stats(
+            &mut stats,
+            replace_render_mesh(
                 &self.device,
-                &meshes.water,
-                chunk_pos,
+                &self.queue,
                 &self.chunk_pipeline.chunk_params_bind_group_layout,
-            );
-            if let Some(fade) = existing_water_fade {
-                data.fade = fade;
-                self.queue
-                    .write_buffer(&data.fade_buffer, 0, bytemuck::bytes_of(&data.fade));
-            }
-            self.water_meshes.insert(chunk_pos, data);
-        } else {
-            self.water_meshes.remove(&chunk_pos);
-        }
+                &mut self.water_meshes,
+                chunk_pos,
+                &meshes.water,
+                spawn_time_seconds,
+            ),
+        );
+
+        stats
     }
 
     pub fn remove_chunk_mesh(&mut self, chunk_pos: ChunkPos) {
@@ -767,6 +772,8 @@ impl Renderer {
         let view = frame
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
+        let frustum_planes = extract_frustum_planes(self.view_proj.get());
+        let mut frame_stats = RenderFrameStats::default();
 
         let mut encoder = self
             .device
@@ -774,7 +781,13 @@ impl Renderer {
                 label: Some("Veldspar Command Encoder"),
             });
 
-        // Sky rendering pass (background)
+        collect_visible_transparent_chunks(
+            &self.water_meshes,
+            &frustum_planes,
+            self.camera_pos.get(),
+            &mut self.visible_transparent,
+        );
+
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Veldspar Sky Pass"),
@@ -798,7 +811,6 @@ impl Renderer {
             self.sky_renderer.render(&mut render_pass);
         }
 
-        // Cloud rendering pass (alpha-blended over sky, before world geometry)
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Veldspar Cloud Pass"),
@@ -817,7 +829,6 @@ impl Renderer {
             self.cloud_renderer.render(&mut render_pass);
         }
 
-        // Main opaque rendering pass (chunks + block highlight)
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Veldspar Opaque Pass"),
@@ -843,9 +854,9 @@ impl Renderer {
             render_pass.set_pipeline(self.chunk_pipeline.pipeline());
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
             render_pass.set_bind_group(1, &self.atlas_bind_group, &[]);
-            render_chunks(&mut render_pass, &self.chunk_meshes, self.view_proj.get(), self.camera_pos.get());
+            let chunk_stats = render_chunks(&mut render_pass, &self.chunk_meshes, &frustum_planes);
+            accumulate_chunk_stats(&mut frame_stats, chunk_stats, true);
 
-            // Render block highlight after chunks, within the same render pass
             self.block_highlight.render(&mut render_pass, &self.camera_bind_group);
             self.break_indicator
                 .render(&mut render_pass, &self.camera_bind_group);
@@ -856,7 +867,6 @@ impl Renderer {
                 .render_mobs(&mut render_pass, &self.camera_bind_group);
         }
 
-        // Water rendering pass (transparent)
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Veldspar Water Pass"),
@@ -882,12 +892,12 @@ impl Renderer {
             render_pass.set_pipeline(self.water_pipeline.pipeline());
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
             render_pass.set_bind_group(1, &self.atlas_bind_group, &[]);
-            render_chunks_transparent(
+            let water_stats = render_visible_transparent_chunks(
                 &mut render_pass,
                 &self.water_meshes,
-                self.view_proj.get(),
-                self.camera_pos.get(),
+                &self.visible_transparent,
             );
+            accumulate_chunk_stats(&mut frame_stats, water_stats, false);
         }
 
         {
@@ -991,6 +1001,80 @@ impl Renderer {
 
         self.queue.submit(std::iter::once(encoder.finish()));
         frame.present();
+        self.last_frame_stats = frame_stats;
         Ok(())
     }
+}
+
+fn accumulate_chunk_stats(
+    frame_stats: &mut RenderFrameStats,
+    pass_stats: ChunkPassStats,
+    opaque: bool,
+) {
+    if opaque {
+        frame_stats.opaque_draw_calls += pass_stats.draw_calls;
+    } else {
+        frame_stats.water_draw_calls += pass_stats.draw_calls;
+    }
+    frame_stats.rendered_chunks += pass_stats.rendered_chunks;
+    frame_stats.rendered_indices += pass_stats.rendered_indices;
+    frame_stats.rendered_vertices += pass_stats.rendered_vertices;
+}
+
+fn accumulate_upload_stats(total: &mut MeshUploadStats, delta: MeshUploadStats) {
+    total.uploaded_bytes += delta.uploaded_bytes;
+    total.buffer_reallocations += delta.buffer_reallocations;
+}
+
+fn replace_render_mesh(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    chunk_params_layout: &wgpu::BindGroupLayout,
+    meshes: &mut FxHashMap<ChunkPos, ChunkRenderData>,
+    chunk_pos: ChunkPos,
+    mesh: &ChunkMesh,
+    spawn_time_seconds: f32,
+) -> MeshUploadStats {
+    if mesh.is_empty() {
+        meshes.remove(&chunk_pos);
+        return MeshUploadStats::default();
+    }
+
+    if let Some(existing) = meshes.get_mut(&chunk_pos) {
+        return update_mesh_buffers(device, queue, existing, mesh);
+    }
+
+    let (data, stats) = upload_mesh(
+        device,
+        queue,
+        mesh,
+        chunk_pos,
+        chunk_params_layout,
+        spawn_time_seconds,
+    );
+    meshes.insert(chunk_pos, data);
+    stats
+}
+
+fn create_texture_bind_group(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    texture_view: &wgpu::TextureView,
+    sampler: &wgpu::Sampler,
+    label: &'static str,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some(label),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(texture_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::Sampler(sampler),
+            },
+        ],
+    })
 }

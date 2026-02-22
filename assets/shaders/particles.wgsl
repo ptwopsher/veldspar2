@@ -6,6 +6,10 @@ struct CameraUniform {
     fog_end: f32,
     time_of_day: f32,
     underwater: f32,
+    render_time_seconds: f32,
+    _padding0: f32,
+    _padding1: f32,
+    _padding2: f32,
 };
 
 @group(0) @binding(0)

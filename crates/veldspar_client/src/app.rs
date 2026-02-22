@@ -37,8 +37,9 @@ use crate::mesh_worker::{MeshRequest, MeshWorker};
 use crate::net::ClientNet;
 use crate::persistence::{scan_worlds, ClientPersistence, SavedPlayMode, WorldMeta, WorldSummary};
 use crate::renderer::item_drop_renderer::ItemDropRenderData;
-use crate::renderer::Renderer;
+use crate::renderer::mesh::{ChunkMeshes, ChunkVertex};
 use crate::renderer::player_renderer::{MobRenderInfo, RemotePlayer};
+use crate::renderer::{RenderFrameStats, Renderer};
 use crate::ui::debug_overlay::DebugInfo;
 use crate::ui::inventory;
 use crate::ui::main_menu::{
@@ -65,6 +66,7 @@ const PLAYER_HALF_W: f32 = 0.3;
 const PLAYER_HEIGHT: f32 = 1.8;
 const MULTIPLAYER_MAX_IN_FLIGHT_CHUNKS: usize = 48;
 const MULTIPLAYER_CHUNK_BATCH_SIZE: usize = 8;
+const SINGLEPLAYER_CHUNK_REQUEST_BATCH_SIZE: usize = 128;
 const MIN_CHUNKS_PER_FRAME: usize = 1;
 const MAX_CHUNKS_PER_FRAME: usize = 4;
 const LAVA_SIMULATION_INTERVAL_FRAMES: u8 = 3;
@@ -118,6 +120,12 @@ const MAX_CONSOLE_MESSAGES: usize = 8;
 const MAX_CHAT_MESSAGES: usize = 100;
 const CHAT_VISIBLE_MESSAGES: usize = 6;
 const CHAT_FADE_SECS: f32 = 10.0;
+const FRAME_TIME_HISTORY_LEN: usize = 256;
+const PERF_LOG_INTERVAL_SECS: f32 = 1.0;
+const UPLOAD_BUDGET_HIGH_BYTES: u64 = 16 * 1024 * 1024;
+const UPLOAD_BUDGET_MEDIUM_BYTES: u64 = 8 * 1024 * 1024;
+const UPLOAD_BUDGET_LOW_BYTES: u64 = 4 * 1024 * 1024;
+const UPLOAD_BUDGET_MIN_BYTES: u64 = 2 * 1024 * 1024;
 const MAX_HEALTH: f32 = 20.0;
 const MAX_AIR_SUPPLY: f32 = 300.0; // 15 seconds at 20 tps
 const FALL_DAMAGE_SAFE_DISTANCE: f32 = 3.0;
@@ -506,6 +514,34 @@ impl Default for BlockScanState {
     }
 }
 
+#[derive(Debug, Clone)]
+struct PendingMeshUpload {
+    chunk_pos: ChunkPos,
+    meshes: ChunkMeshes,
+    version: u64,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct UploadFrameStats {
+    uploaded_bytes: u64,
+    uploaded_chunks: u32,
+    buffer_reallocations: u32,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct FrameTimeStats {
+    avg_ms: f32,
+    p95_ms: f32,
+    p99_ms: f32,
+    max_ms: f32,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct MeshUploadBudget {
+    max_bytes: u64,
+    max_chunks: usize,
+}
+
 struct ClientApp {
     window: Option<Arc<Window>>,
     renderer: Option<Renderer>,
@@ -519,6 +555,12 @@ struct ClientApp {
     fps: f32,
     fps_frame_count: u32,
     fps_sample_start: Option<Instant>,
+    render_time_seconds: f32,
+    frame_time_samples_ms: VecDeque<f32>,
+    perf_log_timer_seconds: f32,
+    pending_mesh_uploads: VecDeque<PendingMeshUpload>,
+    last_upload_stats: UploadFrameStats,
+    last_render_stats: RenderFrameStats,
     chunks: HashMap<ChunkPos, ChunkData>,
     dirty_chunks: HashSet<ChunkPos>,
     registry: Option<Arc<BlockRegistry>>,
@@ -567,6 +609,7 @@ struct ClientApp {
     last_player_chunk: Option<ChunkPos>,
     mesh_queue: VecDeque<ChunkPos>,
     mesh_queue_set: HashSet<ChunkPos>,
+    mesh_jobs_in_flight: HashSet<ChunkPos>,
     mesh_worker: Option<MeshWorker>,
     mesh_versions: HashMap<ChunkPos, u64>,
     chunk_lods: HashMap<ChunkPos, u8>,
@@ -627,7 +670,7 @@ struct ClientApp {
     chat_open: bool,
     chat_input: String,
     chat_messages: VecDeque<ChatMessage>,
-    tnt_explosion_queue: Vec<IVec3>,
+    tnt_explosion_queue: VecDeque<IVec3>,
     furnace_data: HashMap<IVec3, FurnaceState>,
     open_furnace: Option<IVec3>,
     bed_spawn_point: Option<Vec3>,
@@ -639,6 +682,7 @@ impl Default for ClientApp {
     fn default() -> Self {
         let settings_path = PathBuf::from(SETTINGS_PATH);
         let settings = load_or_create_settings(&settings_path);
+        let show_debug = settings.show_fps;
         let mut camera = Camera::default();
         camera.fov = settings.fov.to_radians();
         let inventory = Inventory::new();
@@ -652,11 +696,17 @@ impl Default for ClientApp {
             last_frame: None,
             cursor_grabbed: false,
             settings_path,
-            settings: settings.clone(),
-            show_debug: settings.show_fps,
+            settings,
+            show_debug,
             fps: 0.0,
             fps_frame_count: 0,
             fps_sample_start: None,
+            render_time_seconds: 0.0,
+            frame_time_samples_ms: VecDeque::with_capacity(FRAME_TIME_HISTORY_LEN),
+            perf_log_timer_seconds: 0.0,
+            pending_mesh_uploads: VecDeque::new(),
+            last_upload_stats: UploadFrameStats::default(),
+            last_render_stats: RenderFrameStats::default(),
             chunks: HashMap::new(),
             dirty_chunks: HashSet::new(),
             registry: None,
@@ -705,6 +755,7 @@ impl Default for ClientApp {
             last_player_chunk: None,
             mesh_queue: VecDeque::new(),
             mesh_queue_set: HashSet::new(),
+            mesh_jobs_in_flight: HashSet::new(),
             mesh_worker: None,
             mesh_versions: HashMap::new(),
             chunk_lods: HashMap::new(),
@@ -765,7 +816,7 @@ impl Default for ClientApp {
             chat_open: false,
             chat_input: String::new(),
             chat_messages: VecDeque::new(),
-            tnt_explosion_queue: Vec::new(),
+            tnt_explosion_queue: VecDeque::new(),
             furnace_data: HashMap::new(),
             open_furnace: None,
             bed_spawn_point: None,
@@ -803,7 +854,7 @@ impl ClientApp {
     }
 
     fn apply_settings(&mut self) {
-        self.settings = self.settings.clone().sanitize();
+        self.settings = std::mem::take(&mut self.settings).sanitize();
         self.camera.fov = self.settings.fov.to_radians();
         self.show_debug = self.settings.show_fps;
     }
@@ -909,6 +960,15 @@ impl ClientApp {
         self.save_settings();
     }
 
+    fn set_gui_scale(&mut self, gui_scale: f32) {
+        let new_value = gui_scale.clamp(MIN_GUI_SCALE, MAX_GUI_SCALE);
+        if (self.settings.gui_scale - new_value).abs() < f32::EPSILON {
+            return;
+        }
+        self.settings.gui_scale = new_value;
+        self.save_settings();
+    }
+
     fn set_slider_from_fraction(&mut self, slider: SettingsSliderKind, value: f32) {
         let value = value.clamp(0.0, 1.0);
         match slider {
@@ -947,22 +1007,26 @@ impl ClientApp {
             }
             SettingsSliderKind::GuiScale => {
                 let span = MAX_GUI_SCALE - MIN_GUI_SCALE;
-                let new_value =
-                    (MIN_GUI_SCALE + value * span).clamp(MIN_GUI_SCALE, MAX_GUI_SCALE);
-                if (self.settings.gui_scale - new_value).abs() > f32::EPSILON {
-                    self.settings.gui_scale = new_value;
-                    self.save_settings();
-                }
+                self.set_gui_scale(MIN_GUI_SCALE + value * span);
             }
         }
     }
 
-    fn clear_gameplay_input_state(&mut self) {
+    fn clear_transient_input_state(&mut self) {
         self.input = InputState::default();
         self.breaking_block = None;
         self.break_progress = 0.0;
         self.was_left_click_down = false;
+    }
+
+    fn clear_gameplay_input_state(&mut self) {
+        self.clear_transient_input_state();
         self.sprinting = false;
+    }
+
+    fn refresh_selected_block(&mut self) {
+        self.selected_block =
+            selected_block_from_inventory(&self.inventory, self.selected_hotbar_slot);
     }
 
     fn is_survival_mode(&self) -> bool {
@@ -996,15 +1060,19 @@ impl ClientApp {
         }
     }
 
+    fn recalculate_xp_level(&mut self) {
+        self.xp_level = 0;
+        while Self::xp_for_level(self.xp_level + 1) <= self.xp_total {
+            self.xp_level += 1;
+        }
+    }
+
     fn add_xp(&mut self, amount: u32) {
         if amount == 0 {
             return;
         }
         self.xp_total = self.xp_total.saturating_add(amount);
-        self.xp_level = 0;
-        while Self::xp_for_level(self.xp_level + 1) <= self.xp_total {
-            self.xp_level += 1;
-        }
+        self.recalculate_xp_level();
     }
 
     fn xp_progress(&self) -> f32 {
@@ -1115,7 +1183,7 @@ impl ClientApp {
                 populate_creative_hotbar(&mut self.inventory);
             }
         }
-        self.selected_block = selected_block_from_inventory(&self.inventory, self.selected_hotbar_slot);
+        self.refresh_selected_block();
     }
 
     fn reset_weather_state(&mut self) {
@@ -1297,17 +1365,15 @@ impl ClientApp {
             .chest_inventories
             .entry(primary_pos)
             .or_insert_with(Inventory::new);
-        for slot in 0..SINGLE_CHEST_SLOT_COUNT {
-            primary_inventory.slots[slot] = slots[slot];
-        }
+        primary_inventory.slots[..SINGLE_CHEST_SLOT_COUNT]
+            .clone_from_slice(&slots[..SINGLE_CHEST_SLOT_COUNT]);
 
         let partner_inventory = self
             .chest_inventories
             .entry(partner_pos)
             .or_insert_with(Inventory::new);
-        for slot in 0..SINGLE_CHEST_SLOT_COUNT {
-            partner_inventory.slots[slot] = slots[SINGLE_CHEST_SLOT_COUNT + slot];
-        }
+        partner_inventory.slots[..SINGLE_CHEST_SLOT_COUNT]
+            .clone_from_slice(&slots[SINGLE_CHEST_SLOT_COUNT..DOUBLE_CHEST_SLOT_COUNT]);
     }
 
     fn close_open_chest_ui(&mut self) {
@@ -1333,11 +1399,7 @@ impl ClientApp {
         }
         self.inventory_open = open;
         self.clear_gameplay_input_state();
-        if open {
-            self.set_cursor_grab(false);
-        } else {
-            self.set_cursor_grab(true);
-        }
+        self.set_cursor_grab(!open);
     }
 
     fn reset_inventory_drag_distribution(&mut self) {
@@ -1437,7 +1499,7 @@ impl ClientApp {
         } else {
             self.cursor_stack = Some(ItemStack::new(item, cursor_remaining));
         }
-        self.selected_block = selected_block_from_inventory(&self.inventory, self.selected_hotbar_slot);
+        self.refresh_selected_block();
         self.reset_inventory_drag_distribution();
     }
 
@@ -1475,7 +1537,7 @@ impl ClientApp {
         if let Some(ref mut s) = self.inventory.slots[target_slot] {
             s.count = total;
         }
-        self.selected_block = selected_block_from_inventory(&self.inventory, self.selected_hotbar_slot);
+        self.refresh_selected_block();
     }
 
     fn open_inventory_ui(&mut self, mode: inventory::CraftingUiMode) {
@@ -1498,14 +1560,12 @@ impl ClientApp {
             self.double_chest_partner = Some(partner_pos);
             let mut slots = [None; DOUBLE_CHEST_SLOT_COUNT];
             if let Some(primary_inventory) = self.chest_inventories.get(&chest_pos) {
-                for slot in 0..SINGLE_CHEST_SLOT_COUNT {
-                    slots[slot] = primary_inventory.slots[slot];
-                }
+                slots[..SINGLE_CHEST_SLOT_COUNT]
+                    .clone_from_slice(&primary_inventory.slots[..SINGLE_CHEST_SLOT_COUNT]);
             }
             if let Some(partner_inventory) = self.chest_inventories.get(&partner_pos) {
-                for slot in 0..SINGLE_CHEST_SLOT_COUNT {
-                    slots[SINGLE_CHEST_SLOT_COUNT + slot] = partner_inventory.slots[slot];
-                }
+                slots[SINGLE_CHEST_SLOT_COUNT..DOUBLE_CHEST_SLOT_COUNT]
+                    .clone_from_slice(&partner_inventory.slots[..SINGLE_CHEST_SLOT_COUNT]);
             }
             self.double_chest_slots = Some(slots);
         } else {
@@ -1586,7 +1646,26 @@ impl ClientApp {
                 ..stack
             });
         }
-        self.selected_block = selected_block_from_inventory(&self.inventory, self.selected_hotbar_slot);
+        self.refresh_selected_block();
+    }
+
+    fn try_swap_inventory_slot_with_armor(&mut self, slot_index: usize) -> bool {
+        if self.cursor_stack.is_some() {
+            return false;
+        }
+        let Some(item) = self.inventory.slots[slot_index].as_ref().map(|stack| stack.item) else {
+            return false;
+        };
+        let Some(armor_slot) = armor_slot_for_item(item) else {
+            return false;
+        };
+        let armor_index = Self::armor_slot_index(armor_slot);
+        std::mem::swap(
+            &mut self.armor_slots[armor_index],
+            &mut self.inventory.slots[slot_index],
+        );
+        self.refresh_selected_block();
+        true
     }
 
     fn handle_inventory_slot_click(&mut self, slot_index: usize) {
@@ -1594,24 +1673,12 @@ impl ClientApp {
             return;
         }
 
-        if self.cursor_stack.is_none() {
-            if let Some(stack) = self.inventory.slots[slot_index] {
-                if let Some(armor_slot) = armor_slot_for_item(stack.item) {
-                    let armor_index = Self::armor_slot_index(armor_slot);
-                    let equipped = self.armor_slots[armor_index];
-                    self.armor_slots[armor_index] = Some(stack);
-                    self.inventory.slots[slot_index] = equipped;
-                    self.selected_block = selected_block_from_inventory(
-                        &self.inventory,
-                        self.selected_hotbar_slot,
-                    );
-                    return;
-                }
-            }
+        if self.try_swap_inventory_slot_with_armor(slot_index) {
+            return;
         }
 
         swap_or_merge_slot_with_cursor(&mut self.inventory.slots[slot_index], &mut self.cursor_stack);
-        self.selected_block = selected_block_from_inventory(&self.inventory, self.selected_hotbar_slot);
+        self.refresh_selected_block();
     }
 
     fn handle_inventory_slot_right_click(&mut self, slot_index: usize) {
@@ -1619,79 +1686,57 @@ impl ClientApp {
             return;
         }
 
-        if self.cursor_stack.is_none() {
-            if let Some(stack) = self.inventory.slots[slot_index] {
-                if let Some(armor_slot) = armor_slot_for_item(stack.item) {
-                    let armor_index = Self::armor_slot_index(armor_slot);
-                    let equipped = self.armor_slots[armor_index];
-                    self.armor_slots[armor_index] = Some(stack);
-                    self.inventory.slots[slot_index] = equipped;
-                    self.selected_block = selected_block_from_inventory(
-                        &self.inventory,
-                        self.selected_hotbar_slot,
-                    );
-                    return;
-                }
-            }
+        if self.try_swap_inventory_slot_with_armor(slot_index) {
+            return;
         }
 
         right_click_slot(&mut self.inventory.slots[slot_index], &mut self.cursor_stack);
-        self.selected_block = selected_block_from_inventory(&self.inventory, self.selected_hotbar_slot);
+        self.refresh_selected_block();
+    }
+
+    fn handle_chest_slot_interaction(&mut self, slot_index: usize, right_click: bool) {
+        let slot_limit = if self.double_chest_slots.is_some() {
+            DOUBLE_CHEST_SLOT_COUNT
+        } else {
+            SINGLE_CHEST_SLOT_COUNT
+        };
+        if slot_index >= slot_limit || self.open_chest.is_none() {
+            return;
+        }
+
+        if let Some(slots) = self.double_chest_slots.as_mut() {
+            if right_click {
+                right_click_slot(&mut slots[slot_index], &mut self.cursor_stack);
+            } else {
+                swap_or_merge_slot_with_cursor(&mut slots[slot_index], &mut self.cursor_stack);
+            }
+            return;
+        }
+
+        let chest_pos = self.open_chest.expect("checked above");
+        let chest_inventory = self
+            .chest_inventories
+            .entry(chest_pos)
+            .or_insert_with(Inventory::new);
+        if right_click {
+            right_click_slot(
+                &mut chest_inventory.slots[slot_index],
+                &mut self.cursor_stack,
+            );
+        } else {
+            swap_or_merge_slot_with_cursor(
+                &mut chest_inventory.slots[slot_index],
+                &mut self.cursor_stack,
+            );
+        }
     }
 
     fn handle_chest_slot_click(&mut self, slot_index: usize) {
-        let slot_limit = if self.double_chest_slots.is_some() {
-            DOUBLE_CHEST_SLOT_COUNT
-        } else {
-            SINGLE_CHEST_SLOT_COUNT
-        };
-        if slot_index >= slot_limit {
-            return;
-        }
-        if self.open_chest.is_none() {
-            return;
-        }
-
-        if let Some(slots) = self.double_chest_slots.as_mut() {
-            swap_or_merge_slot_with_cursor(&mut slots[slot_index], &mut self.cursor_stack);
-            return;
-        }
-
-        let chest_pos = self.open_chest.expect("checked above");
-        let chest_inventory = self
-            .chest_inventories
-            .entry(chest_pos)
-            .or_insert_with(Inventory::new);
-        swap_or_merge_slot_with_cursor(
-            &mut chest_inventory.slots[slot_index],
-            &mut self.cursor_stack,
-        );
+        self.handle_chest_slot_interaction(slot_index, false);
     }
 
     fn handle_chest_slot_right_click(&mut self, slot_index: usize) {
-        let slot_limit = if self.double_chest_slots.is_some() {
-            DOUBLE_CHEST_SLOT_COUNT
-        } else {
-            SINGLE_CHEST_SLOT_COUNT
-        };
-        if slot_index >= slot_limit {
-            return;
-        }
-        if self.open_chest.is_none() {
-            return;
-        }
-
-        if let Some(slots) = self.double_chest_slots.as_mut() {
-            right_click_slot(&mut slots[slot_index], &mut self.cursor_stack);
-            return;
-        }
-
-        let chest_pos = self.open_chest.expect("checked above");
-        let chest_inventory = self
-            .chest_inventories
-            .entry(chest_pos)
-            .or_insert_with(Inventory::new);
-        right_click_slot(&mut chest_inventory.slots[slot_index], &mut self.cursor_stack);
+        self.handle_chest_slot_interaction(slot_index, true);
     }
 
     fn handle_crafting_input_slot_click(&mut self, input_idx: usize) {
@@ -1943,12 +1988,7 @@ impl ClientApp {
                 self.set_fov(self.settings.fov + direction);
             }
             SettingsMenuItem::GuiScale => {
-                let new_value =
-                    (self.settings.gui_scale + direction * 0.5).clamp(MIN_GUI_SCALE, MAX_GUI_SCALE);
-                if (self.settings.gui_scale - new_value).abs() > f32::EPSILON {
-                    self.settings.gui_scale = new_value;
-                    self.save_settings();
-                }
+                self.set_gui_scale(self.settings.gui_scale + direction * 0.5);
             }
             SettingsMenuItem::ShowFps => self.set_show_fps(!self.settings.show_fps),
             SettingsMenuItem::Back => {}
@@ -1993,10 +2033,7 @@ impl ClientApp {
             }
         }
         self.console_open = open;
-        self.input = InputState::default();
-        self.breaking_block = None;
-        self.break_progress = 0.0;
-        self.was_left_click_down = false;
+        self.clear_transient_input_state();
         if !open {
             self.text_input.clear();
         }
@@ -2026,10 +2063,7 @@ impl ClientApp {
             }
         }
         self.chat_open = open;
-        self.input = InputState::default();
-        self.breaking_block = None;
-        self.break_progress = 0.0;
-        self.was_left_click_down = false;
+        self.clear_transient_input_state();
         if !open {
             self.chat_input.clear();
         }
@@ -2200,10 +2234,7 @@ impl ClientApp {
 
     fn set_xp_total(&mut self, amount: u32) {
         self.xp_total = amount;
-        self.xp_level = 0;
-        while Self::xp_for_level(self.xp_level + 1) <= self.xp_total {
-            self.xp_level += 1;
-        }
+        self.recalculate_xp_level();
     }
 
     fn teleport_player(&mut self, x: f32, y: f32, z: f32) {
@@ -2655,7 +2686,7 @@ impl ClientApp {
                 }
                 self.inventory.slots.fill(None);
                 self.reset_inventory_drag_distribution();
-                self.selected_block = selected_block_from_inventory(&self.inventory, self.selected_hotbar_slot);
+                self.refresh_selected_block();
                 self.push_command_feedback(target, "Inventory cleared");
             }
             "clearhotbar" => {
@@ -2667,7 +2698,7 @@ impl ClientApp {
                     self.inventory.slots[slot] = None;
                 }
                 self.reset_inventory_drag_distribution();
-                self.selected_block = selected_block_from_inventory(&self.inventory, self.selected_hotbar_slot);
+                self.refresh_selected_block();
                 self.push_command_feedback(target, "Hotbar cleared");
             }
             "cleararmor" => {
@@ -2698,7 +2729,7 @@ impl ClientApp {
                 self.inventory_crafting_slots = [None; 4];
                 self.table_crafting_slots = [None; 9];
                 self.reset_inventory_drag_distribution();
-                self.selected_block = selected_block_from_inventory(&self.inventory, self.selected_hotbar_slot);
+                self.refresh_selected_block();
                 self.push_command_feedback(target, "Inventory, armor, cursor and crafting slots cleared");
             }
             "give" => {
@@ -2727,8 +2758,7 @@ impl ClientApp {
                 };
 
                 let remaining = self.inventory.add_item(item_id, count);
-                self.selected_block =
-                    selected_block_from_inventory(&self.inventory, self.selected_hotbar_slot);
+                self.refresh_selected_block();
                 let added = count.saturating_sub(remaining);
                 if added == 0 {
                     self.push_command_feedback(target, "Inventory is full.");
@@ -2761,8 +2791,7 @@ impl ClientApp {
                 }
                 match args[0].parse::<f32>() {
                     Ok(value) => {
-                        self.settings.gui_scale = value.clamp(MIN_GUI_SCALE, MAX_GUI_SCALE);
-                        self.save_settings();
+                        self.set_gui_scale(value);
                         self.push_command_feedback(
                             target,
                             format!("GUI scale set to {:.1}x", self.settings.gui_scale),
@@ -2966,8 +2995,8 @@ impl ClientApp {
             "bone_meal" | "bonemeal" => Some(ItemId::BONE_MEAL),
             _ => None,
         };
-        if explicit_item.is_some() {
-            return explicit_item;
+        if let Some(item_id) = explicit_item {
+            return Some(item_id);
         }
 
         self.registry
@@ -3031,6 +3060,7 @@ impl ClientApp {
 
         if self.show_debug {
             let (mode, connection_status) = self.mode_and_connection_status();
+            let frame_time_stats = self.frame_time_stats();
             let debug_info = DebugInfo::from_camera(
                 &self.camera,
                 self.fps,
@@ -3041,6 +3071,14 @@ impl ClientApp {
                 self.mesh_queue.len(),
                 mode,
                 connection_status,
+                self.last_render_stats,
+                self.last_upload_stats.uploaded_bytes,
+                self.last_upload_stats.uploaded_chunks,
+                self.last_upload_stats.buffer_reallocations,
+                frame_time_stats.avg_ms,
+                frame_time_stats.p95_ms,
+                frame_time_stats.p99_ms,
+                frame_time_stats.max_ms,
             );
             lines.extend(debug_info.overlay_lines());
         }
@@ -3097,6 +3135,60 @@ impl ClientApp {
         }
 
         lines
+    }
+
+    fn record_frame_time_sample(&mut self, frame_ms: f32) {
+        if self.frame_time_samples_ms.len() == FRAME_TIME_HISTORY_LEN {
+            self.frame_time_samples_ms.pop_front();
+        }
+        self.frame_time_samples_ms.push_back(frame_ms.max(0.0));
+    }
+
+    fn frame_time_stats(&self) -> FrameTimeStats {
+        if self.frame_time_samples_ms.is_empty() {
+            return FrameTimeStats::default();
+        }
+
+        let mut sorted: Vec<f32> = self.frame_time_samples_ms.iter().copied().collect();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        let len = sorted.len();
+        let avg_ms = sorted.iter().sum::<f32>() / len as f32;
+        let p95_idx = percentile_index(len, 0.95);
+        let p99_idx = percentile_index(len, 0.99);
+        let max_ms = *sorted.last().unwrap_or(&0.0);
+
+        FrameTimeStats {
+            avg_ms,
+            p95_ms: sorted[p95_idx],
+            p99_ms: sorted[p99_idx],
+            max_ms,
+        }
+    }
+
+    fn log_performance_metrics_if_due(&mut self) {
+        if self.perf_log_timer_seconds < PERF_LOG_INTERVAL_SECS {
+            return;
+        }
+        self.perf_log_timer_seconds -= PERF_LOG_INTERVAL_SECS;
+
+        let frame_time_stats = self.frame_time_stats();
+        info!(
+            "render stats | frame_ms avg={:.2} p95={:.2} p99={:.2} max={:.2} | draws opaque={} water={} | chunks={} indices={} vertices={} | uploads bytes={} chunks={} reallocs={} pending_uploads={}",
+            frame_time_stats.avg_ms,
+            frame_time_stats.p95_ms,
+            frame_time_stats.p99_ms,
+            frame_time_stats.max_ms,
+            self.last_render_stats.opaque_draw_calls,
+            self.last_render_stats.water_draw_calls,
+            self.last_render_stats.rendered_chunks,
+            self.last_render_stats.rendered_indices,
+            self.last_render_stats.rendered_vertices,
+            self.last_upload_stats.uploaded_bytes,
+            self.last_upload_stats.uploaded_chunks,
+            self.last_upload_stats.buffer_reallocations,
+            self.pending_mesh_uploads.len(),
+        );
     }
 
     fn world_summary_to_entry(summary: WorldSummary) -> WorldMenuEntry {
@@ -3392,6 +3484,13 @@ impl ClientApp {
 
     fn start_singleplayer(&mut self, world_dir: PathBuf, world_name: Option<String>) {
         let mut startup_play_mode = self.world_create_play_mode;
+        self.render_time_seconds = 0.0;
+        self.frame_time_samples_ms.clear();
+        self.perf_log_timer_seconds = 0.0;
+        self.pending_mesh_uploads.clear();
+        self.mesh_jobs_in_flight.clear();
+        self.last_upload_stats = UploadFrameStats::default();
+        self.last_render_stats = RenderFrameStats::default();
         self.world_seed = DEFAULT_WORLD_SEED;
         self.player_pos = Vec3::new(0.0, 40.0, 0.0);
         self.velocity = Vec3::ZERO;
@@ -3515,7 +3614,6 @@ impl ClientApp {
         self.set_console_open(false);
         self.set_chat_open(false);
         self.chat_messages.clear();
-        self.selected_block = selected_block_from_inventory(&self.inventory, self.selected_hotbar_slot);
     }
 
     fn start_multiplayer(&mut self) {
@@ -3536,6 +3634,12 @@ impl ClientApp {
         self.registry = Some(registry);
         self.rebuild_creative_catalog();
         self.mesh_worker = Some(MeshWorker::new());
+        self.render_time_seconds = 0.0;
+        self.frame_time_samples_ms.clear();
+        self.perf_log_timer_seconds = 0.0;
+        self.pending_mesh_uploads.clear();
+        self.last_upload_stats = UploadFrameStats::default();
+        self.last_render_stats = RenderFrameStats::default();
         self.world_seed = DEFAULT_WORLD_SEED;
         self.active_world_dir = None;
         self.active_world_name = None;
@@ -3546,6 +3650,7 @@ impl ClientApp {
         self.pending_chunks.clear();
         self.mesh_queue.clear();
         self.mesh_queue_set.clear();
+        self.mesh_jobs_in_flight.clear();
         self.mesh_versions.clear();
         self.chunk_lods.clear();
         self.last_player_chunk = None;
@@ -3623,6 +3728,7 @@ impl ClientApp {
         self.lava_simulation_frame_accumulator = 0;
         self.mesh_queue.clear();
         self.mesh_queue_set.clear();
+        self.mesh_jobs_in_flight.clear();
         self.mesh_versions.clear();
         self.chunk_lods.clear();
         self.pending_chunks.clear();
@@ -3632,6 +3738,9 @@ impl ClientApp {
         self.remote_players.clear();
         self.remote_player_states.clear();
         self.remote_break_overlays.clear();
+        self.pending_mesh_uploads.clear();
+        self.last_upload_stats = UploadFrameStats::default();
+        self.last_render_stats = RenderFrameStats::default();
         self.close_open_chest_ui();
         self.chest_inventories.clear();
         self.armor_slots = [None; 4];
@@ -4577,7 +4686,7 @@ impl ClientApp {
         }
 
         if inventory_changed {
-            self.selected_block = selected_block_from_inventory(&self.inventory, self.selected_hotbar_slot);
+            self.refresh_selected_block();
         }
     }
 
@@ -4678,14 +4787,16 @@ impl ClientApp {
 
     fn enqueue_tnt_explosion(&mut self, pos: IVec3) {
         if !self.tnt_explosion_queue.contains(&pos) {
-            self.tnt_explosion_queue.push(pos);
+            self.tnt_explosion_queue.push_back(pos);
         }
     }
 
     fn process_tnt_explosion_queue(&mut self) {
         let explosions_this_frame = self.tnt_explosion_queue.len().min(2);
         for _ in 0..explosions_this_frame {
-            let center = self.tnt_explosion_queue.remove(0);
+            let Some(center) = self.tnt_explosion_queue.pop_front() else {
+                break;
+            };
             self.explode_tnt(center);
         }
     }
@@ -4771,15 +4882,13 @@ impl ClientApp {
     }
 
     fn tick_furnaces(&mut self, dt: f32) {
-        let positions: Vec<IVec3> = self.furnace_data.keys().copied().collect();
-        for pos in positions {
+        for (&pos, state) in &mut self.furnace_data {
             // Only tick furnaces near player (within 8 chunks)
             let dx = (pos.x as f32 - self.player_pos.x).abs();
             let dz = (pos.z as f32 - self.player_pos.z).abs();
             if dx > 256.0 || dz > 256.0 {
                 continue;
             }
-            let state = self.furnace_data.get_mut(&pos).unwrap();
             // Consume fuel if needed
             if state.fuel_remaining <= 0.0 {
                 if let Some(fuel_stack) = &mut state.fuel {
@@ -5797,6 +5906,7 @@ impl ClientApp {
     fn unload_chunk(&mut self, pos: ChunkPos) {
         if self.chunks.remove(&pos).is_none() {
             self.pending_chunks.remove(&pos);
+            self.mesh_jobs_in_flight.remove(&pos);
             return;
         }
 
@@ -5806,6 +5916,7 @@ impl ClientApp {
         self.mesh_versions.remove(&pos);
         self.mesh_queue.retain(|queued| *queued != pos);
         self.mesh_queue_set.remove(&pos);
+        self.mesh_jobs_in_flight.remove(&pos);
 
         if let Some(renderer) = self.renderer.as_mut() {
             renderer.remove_chunk_mesh(pos);
@@ -6027,13 +6138,19 @@ impl ClientApp {
             .copied()
             .collect();
 
-        // Send generation requests for missing chunks (instead of generating inline)
+        // Send a capped, distance-prioritized generation batch each frame.
         let Some(tx) = self.chunk_request_tx.as_ref() else { return; };
-        for pos in desired {
-            if !self.chunks.contains_key(&pos) && !self.pending_chunks.contains(&pos) {
-                let _ = tx.send(pos);
-                self.pending_chunks.insert(pos);
-            }
+        let mut missing: Vec<ChunkPos> = desired
+            .into_iter()
+            .filter(|pos| !self.chunks.contains_key(pos) && !self.pending_chunks.contains(pos))
+            .collect();
+        Self::sort_chunks_nearest(&mut missing, player_chunk);
+        for pos in missing
+            .into_iter()
+            .take(SINGLEPLAYER_CHUNK_REQUEST_BATCH_SIZE)
+        {
+            let _ = tx.send(pos);
+            self.pending_chunks.insert(pos);
         }
 
         for &pos in &to_remove {
@@ -6041,11 +6158,17 @@ impl ClientApp {
             self.pending_chunks.remove(&pos);
             self.chunk_lods.remove(&pos);
             self.mesh_versions.remove(&pos);
+            self.mesh_jobs_in_flight.remove(&pos);
         }
         if let Some(renderer) = self.renderer.as_mut() {
             for &pos in &to_remove {
                 renderer.remove_chunk_mesh(pos);
             }
+        }
+        if !to_remove.is_empty() {
+            let removed: HashSet<ChunkPos> = to_remove.iter().copied().collect();
+            self.pending_mesh_uploads
+                .retain(|pending| !removed.contains(&pending.chunk_pos));
         }
 
         let removed_count = to_remove.len();
@@ -6132,6 +6255,13 @@ impl ClientApp {
     }
 
     fn remesh_chunk(&mut self, chunk_pos: ChunkPos) {
+        if self.mesh_jobs_in_flight.contains(&chunk_pos) {
+            if self.mesh_queue_set.insert(chunk_pos) {
+                self.mesh_queue.push_back(chunk_pos);
+            }
+            return;
+        }
+
         let Some(chunk) = self.chunks.get(&chunk_pos) else {
             return;
         };
@@ -6211,6 +6341,7 @@ impl ClientApp {
             version: current_version,
             lod_level,
         };
+        self.mesh_jobs_in_flight.insert(chunk_pos);
         mesh_worker.submit(request);
     }
 
@@ -6220,16 +6351,17 @@ impl ClientApp {
             None => return,
         };
 
-        let Some(renderer) = self.renderer.as_mut() else {
-            return;
-        };
-
         for (chunk_pos, meshes, version) in completed {
+            self.mesh_jobs_in_flight.remove(&chunk_pos);
             let current_version = self.mesh_versions.get(&chunk_pos).copied().unwrap_or(0);
             if version < current_version {
                 continue;
             }
-            renderer.replace_chunk_mesh(&meshes, chunk_pos);
+            self.pending_mesh_uploads.push_back(PendingMeshUpload {
+                chunk_pos,
+                meshes,
+                version,
+            });
         }
     }
 
@@ -6316,20 +6448,48 @@ impl ClientApp {
     }
 
     fn process_mesh_queue(&mut self) {
-        let count = self
-            .mesh_queue
-            .len()
-            .min(self.mesh_budget_per_frame());
-        let batch: Vec<ChunkPos> = self.mesh_queue.drain(..count).collect();
-        for &pos in &batch {
-            self.mesh_queue_set.remove(&pos);
+        let budget = self.mesh_budget_per_frame();
+        let count = self.mesh_queue.len().min(budget);
+        if count == 0 {
+            return;
         }
-        for pos in batch {
+
+        let player_chunk = self.player_chunk_pos();
+        for _ in 0..count {
+            let best_index = self
+                .mesh_queue
+                .iter()
+                .enumerate()
+                .min_by_key(|(_, pos)| {
+                    let dx = (pos.x - player_chunk.x).abs();
+                    let dz = (pos.z - player_chunk.z).abs();
+                    let dy = (pos.y - player_chunk.y).abs();
+                    (dx.max(dz), dy)
+                })
+                .map(|(index, _)| index);
+
+            let Some(index) = best_index else {
+                break;
+            };
+            let Some(pos) = self.mesh_queue.remove(index) else {
+                continue;
+            };
+            self.mesh_queue_set.remove(&pos);
             self.remesh_chunk(pos);
         }
     }
 
     fn mesh_budget_per_frame(&self) -> usize {
+        // Startup recovery mode: when no world chunks are rendered yet, build meshes aggressively.
+        if self.last_render_stats.rendered_chunks == 0 {
+            return 96;
+        }
+        if self.mesh_queue.len() > 2048 {
+            return 48;
+        }
+        if self.mesh_queue.len() > 1024 {
+            return 24;
+        }
         let fps = self.fps;
         let budget = if fps <= 1.0 || fps >= 90.0 {
             MAX_CHUNKS_PER_FRAME
@@ -6343,11 +6503,76 @@ impl ClientApp {
         budget.clamp(MIN_CHUNKS_PER_FRAME, MAX_CHUNKS_PER_FRAME)
     }
 
+    fn process_mesh_upload_queue(&mut self) {
+        let Some(renderer) = self.renderer.as_mut() else {
+            self.last_upload_stats = UploadFrameStats::default();
+            return;
+        };
+        if self.pending_mesh_uploads.is_empty() {
+            self.last_upload_stats = UploadFrameStats::default();
+            return;
+        }
+
+        let mut budget = mesh_upload_budget_for_fps(self.fps);
+        if self.last_render_stats.rendered_chunks == 0 {
+            budget.max_bytes = budget.max_bytes.max(64 * 1024 * 1024);
+            budget.max_chunks = budget.max_chunks.max(256);
+        }
+        let mut frame_stats = UploadFrameStats::default();
+
+        while frame_stats.uploaded_chunks < budget.max_chunks as u32 {
+            let Some(front) = self.pending_mesh_uploads.front() else {
+                break;
+            };
+            let estimated_bytes = mesh_upload_size_bytes(&front.meshes);
+            if !should_upload_next_chunk(
+                frame_stats.uploaded_chunks,
+                frame_stats.uploaded_bytes,
+                estimated_bytes,
+                budget,
+            ) {
+                break;
+            }
+
+            let pending = self
+                .pending_mesh_uploads
+                .pop_front()
+                .expect("pending mesh upload queue front must exist");
+            if !self.chunks.contains_key(&pending.chunk_pos) {
+                continue;
+            }
+            let current_version = self
+                .mesh_versions
+                .get(&pending.chunk_pos)
+                .copied()
+                .unwrap_or(0);
+            if pending.version < current_version {
+                continue;
+            }
+
+            let upload_stats = renderer.replace_chunk_mesh(
+                &pending.meshes,
+                pending.chunk_pos,
+                self.render_time_seconds,
+            );
+            frame_stats.uploaded_bytes += upload_stats.uploaded_bytes;
+            frame_stats.uploaded_chunks += 1;
+            frame_stats.buffer_reallocations += upload_stats.buffer_reallocations;
+        }
+
+        self.last_upload_stats = frame_stats;
+    }
+
     fn poll_generated_chunks(&mut self) {
         let Some(rx) = self.chunk_result_rx.as_ref() else { return; };
 
         // Process up to N chunks per frame to avoid blocking
-        for _ in 0..8 {
+        let limit = if self.last_render_stats.rendered_chunks == 0 {
+            128
+        } else {
+            16
+        };
+        for _ in 0..limit {
             match rx.try_recv() {
                 Ok((pos, chunk)) => {
                     self.pending_chunks.remove(&pos);
@@ -6402,6 +6627,9 @@ impl ClientApp {
             .unwrap_or(1.0 / 60.0);
         self.last_frame = Some(now);
         let dt = dt.min(0.05);
+        self.render_time_seconds += dt;
+        self.record_frame_time_sample(dt * 1000.0);
+        self.perf_log_timer_seconds += dt;
 
         // Main Menu and World Select states
         if !matches!(self.app_state, AppState::InGame) {
@@ -6479,6 +6707,7 @@ impl ClientApp {
         }
         self.process_mesh_queue();
         self.poll_mesh_results();
+        self.process_mesh_upload_queue();
         self.update_remote_players(dt);
 
         // Find spawn point FIRST so chunks_ready checks the right position
@@ -6552,6 +6781,7 @@ impl ClientApp {
                     FOG_END,
                     self.time_of_day,
                     false,
+                    self.render_time_seconds,
                     0.0,
                 );
                 renderer.update_sky(&self.camera, self.time_of_day, 0.0);
@@ -6931,10 +7161,7 @@ impl ClientApp {
                 if left_click_just_pressed {
                     if let Some(targeted_block) = self.targeted_block {
                         self.break_targeted_block_now(targeted_block);
-                        self.selected_block = selected_block_from_inventory(
-                            &self.inventory,
-                            self.selected_hotbar_slot,
-                        );
+                        self.refresh_selected_block();
                     }
                 }
             } else if !self.input.left_click {
@@ -6968,10 +7195,7 @@ impl ClientApp {
                             if matches!(self.play_mode, PlayMode::Survival) {
                                 self.consume_held_tool_durability_on_break();
                             }
-                            self.selected_block = selected_block_from_inventory(
-                                &self.inventory,
-                                self.selected_hotbar_slot,
-                            );
+                            self.refresh_selected_block();
                         }
                     } else {
                         self.break_progress = 0.0;
@@ -7129,10 +7353,7 @@ impl ClientApp {
                             }
                             if self.is_survival_mode() {
                                 self.consume_held_tool_durability_on_use(ToolKind::Hoe);
-                                self.selected_block = selected_block_from_inventory(
-                                    &self.inventory,
-                                    self.selected_hotbar_slot,
-                                );
+                                self.refresh_selected_block();
                             }
                         }
                         break;
@@ -7413,8 +7634,7 @@ impl ClientApp {
 
                 if consume_selected_item && self.is_survival_mode() {
                     self.inventory.remove_item(self.selected_hotbar_slot, 1);
-                    self.selected_block =
-                        selected_block_from_inventory(&self.inventory, self.selected_hotbar_slot);
+                    self.refresh_selected_block();
                 }
 
                 if let Some(GameMode::Multiplayer { ref mut net }) = self.game_mode {
@@ -7539,6 +7759,7 @@ impl ClientApp {
         let chat_input_line = self.chat_open.then(|| format!("> {}", self.chat_input));
         if self.show_debug {
             let (mode, connection_status) = self.mode_and_connection_status();
+            let frame_time_stats = self.frame_time_stats();
             let debug_info = DebugInfo::from_camera(
                 &self.camera,
                 self.fps,
@@ -7549,6 +7770,14 @@ impl ClientApp {
                 self.mesh_queue.len(),
                 mode,
                 connection_status,
+                self.last_render_stats,
+                self.last_upload_stats.uploaded_bytes,
+                self.last_upload_stats.uploaded_chunks,
+                self.last_upload_stats.buffer_reallocations,
+                frame_time_stats.avg_ms,
+                frame_time_stats.p95_ms,
+                frame_time_stats.p99_ms,
+                frame_time_stats.max_ms,
             );
             window.set_title(&debug_info.window_title());
         } else if self.is_in_game_menu_open() {
@@ -7613,6 +7842,7 @@ impl ClientApp {
         let Some(renderer) = self.renderer.as_mut() else {
             return;
         };
+        renderer.reserve_chunk_mesh_capacity(self.chunks.len());
 
         renderer.update_camera_uniform(
             &self.camera,
@@ -7620,6 +7850,7 @@ impl ClientApp {
             FOG_END,
             self.time_of_day,
             underwater,
+            self.render_time_seconds,
             weather_dim,
         );
         renderer.update_sky(&self.camera, self.time_of_day, weather_dim);
@@ -7663,7 +7894,6 @@ impl ClientApp {
             xp_level,
         );
         renderer.set_crosshair_visible(show_crosshair);
-        renderer.advance_fades(dt);
         renderer.update_players(&self.remote_players);
         let mob_infos: Vec<MobRenderInfo> = self
             .mobs
@@ -7731,11 +7961,13 @@ impl ClientApp {
             }
             Err(wgpu::SurfaceError::Timeout | wgpu::SurfaceError::Other) => {}
         }
+        self.last_render_stats = renderer.last_frame_stats();
 
         if should_save {
             self.save_world();
             self.last_save_time = Some(now);
         }
+        self.log_performance_metrics_if_due();
     }
 }
 
@@ -7764,6 +7996,7 @@ impl ApplicationHandler for ClientApp {
                             FOG_END,
                             self.time_of_day,
                             false,
+                            self.render_time_seconds,
                             0.0,
                         );
 
@@ -8176,10 +8409,7 @@ impl ApplicationHandler for ClientApp {
                         };
                         if let Some(slot) = slot_for_key {
                             self.selected_hotbar_slot = slot;
-                            self.selected_block = selected_block_from_inventory(
-                                &self.inventory,
-                                self.selected_hotbar_slot,
-                            );
+                            self.refresh_selected_block();
                         }
                     }
                     ElementState::Released => {
@@ -8214,10 +8444,7 @@ impl ApplicationHandler for ClientApp {
                         let new_slot = (self.selected_hotbar_slot as i32 + scroll)
                             .rem_euclid(Inventory::HOTBAR_SIZE as i32) as usize;
                         self.selected_hotbar_slot = new_slot;
-                        self.selected_block = selected_block_from_inventory(
-                            &self.inventory,
-                            self.selected_hotbar_slot,
-                        );
+                        self.refresh_selected_block();
                     }
                 }
             }
@@ -8378,10 +8605,7 @@ impl ApplicationHandler for ClientApp {
                                             self.inventory.slots.fill(None);
                                             self.armor_slots = [None; 4];
                                             self.cursor_stack = None;
-                                            self.selected_block = selected_block_from_inventory(
-                                                &self.inventory,
-                                                self.selected_hotbar_slot,
-                                            );
+                                            self.refresh_selected_block();
                                         }
                                         inventory::CreativeHitTarget::SearchBar => {}
                                     }
@@ -9473,6 +9697,108 @@ fn block_drop_item(block: BlockId) -> Option<ItemId> {
         Some(ItemId(block.0))
     } else {
         None
+    }
+}
+
+fn percentile_index(len: usize, percentile: f32) -> usize {
+    if len == 0 {
+        return 0;
+    }
+    let rank = (len as f32 * percentile).ceil() as usize;
+    rank.saturating_sub(1).min(len - 1)
+}
+
+fn mesh_upload_budget_for_fps(fps: f32) -> MeshUploadBudget {
+    if fps >= 90.0 {
+        MeshUploadBudget {
+            max_bytes: UPLOAD_BUDGET_HIGH_BYTES,
+            max_chunks: 8,
+        }
+    } else if fps >= 72.0 {
+        MeshUploadBudget {
+            max_bytes: UPLOAD_BUDGET_MEDIUM_BYTES,
+            max_chunks: 4,
+        }
+    } else if fps >= 55.0 {
+        MeshUploadBudget {
+            max_bytes: UPLOAD_BUDGET_LOW_BYTES,
+            max_chunks: 2,
+        }
+    } else {
+        MeshUploadBudget {
+            max_bytes: UPLOAD_BUDGET_MIN_BYTES,
+            max_chunks: 1,
+        }
+    }
+}
+
+fn mesh_upload_size_bytes(meshes: &ChunkMeshes) -> u64 {
+    let vertex_count = meshes.opaque.vertices.len() + meshes.water.vertices.len();
+    let index_bytes = meshes.opaque.indices.index_bytes() + meshes.water.indices.index_bytes();
+    (vertex_count * std::mem::size_of::<ChunkVertex>()) as u64
+        + index_bytes
+}
+
+fn should_upload_next_chunk(
+    uploaded_chunks: u32,
+    uploaded_bytes: u64,
+    next_chunk_bytes: u64,
+    budget: MeshUploadBudget,
+) -> bool {
+    if uploaded_chunks as usize >= budget.max_chunks {
+        return false;
+    }
+    if uploaded_bytes + next_chunk_bytes <= budget.max_bytes {
+        return true;
+    }
+    uploaded_chunks == 0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        mesh_upload_budget_for_fps, should_upload_next_chunk, MeshUploadBudget,
+        UPLOAD_BUDGET_HIGH_BYTES, UPLOAD_BUDGET_LOW_BYTES, UPLOAD_BUDGET_MEDIUM_BYTES,
+        UPLOAD_BUDGET_MIN_BYTES,
+    };
+
+    #[test]
+    fn mesh_upload_budget_selects_expected_tiers() {
+        let high = mesh_upload_budget_for_fps(95.0);
+        assert_eq!(high.max_bytes, UPLOAD_BUDGET_HIGH_BYTES);
+        assert_eq!(high.max_chunks, 8);
+
+        let medium = mesh_upload_budget_for_fps(80.0);
+        assert_eq!(medium.max_bytes, UPLOAD_BUDGET_MEDIUM_BYTES);
+        assert_eq!(medium.max_chunks, 4);
+
+        let low = mesh_upload_budget_for_fps(60.0);
+        assert_eq!(low.max_bytes, UPLOAD_BUDGET_LOW_BYTES);
+        assert_eq!(low.max_chunks, 2);
+
+        let min = mesh_upload_budget_for_fps(40.0);
+        assert_eq!(min.max_bytes, UPLOAD_BUDGET_MIN_BYTES);
+        assert_eq!(min.max_chunks, 1);
+    }
+
+    #[test]
+    fn starvation_rule_allows_first_chunk_over_byte_budget() {
+        let budget = MeshUploadBudget {
+            max_bytes: 2 * 1024 * 1024,
+            max_chunks: 4,
+        };
+        assert!(should_upload_next_chunk(
+            0,
+            0,
+            3 * 1024 * 1024,
+            budget,
+        ));
+        assert!(!should_upload_next_chunk(
+            1,
+            3 * 1024 * 1024,
+            512 * 1024,
+            budget,
+        ));
     }
 }
 

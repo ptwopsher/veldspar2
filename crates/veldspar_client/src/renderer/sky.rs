@@ -150,6 +150,19 @@ pub(crate) fn sky_horizon_color(time_of_day: f32) -> [f32; 4] {
     sky_colors(time_of_day).0
 }
 
+fn lerp_color(a: [f32; 4], b: [f32; 4], t: f32) -> [f32; 4] {
+    [
+        a[0] + (b[0] - a[0]) * t,
+        a[1] + (b[1] - a[1]) * t,
+        a[2] + (b[2] - a[2]) * t,
+        a[3] + (b[3] - a[3]) * t,
+    ]
+}
+
+fn cosine_blend(t: f32) -> f32 {
+    (1.0 - (t * std::f32::consts::PI).cos()) * 0.5
+}
+
 fn sky_colors(time_of_day: f32) -> ([f32; 4], [f32; 4]) {
     // time: 0.0=midnight, 0.25=sunrise, 0.5=noon, 0.75=sunset, 1.0=midnight
 
@@ -165,33 +178,20 @@ fn sky_colors(time_of_day: f32) -> ([f32; 4], [f32; 4]) {
     let sunset_horizon = [0.95, 0.55, 0.25, 1.0];
     let sunset_zenith = [0.35, 0.30, 0.60, 1.0];
 
-    // Helper function to lerp between two colors
-    fn lerp_color(a: [f32; 4], b: [f32; 4], t: f32) -> [f32; 4] {
-        [
-            a[0] + (b[0] - a[0]) * t,
-            a[1] + (b[1] - a[1]) * t,
-            a[2] + (b[2] - a[2]) * t,
-            a[3] + (b[3] - a[3]) * t,
-        ]
-    }
-
     // Smooth interpolation around sunrise (0.25) and sunset (0.75)
-    // Using a cosine-based blend for smooth transitions
     let t = time_of_day;
 
     // Determine which phase we're in and blend accordingly
     if t < 0.2 {
         // Late night to early sunrise
-        let blend = t / 0.2;
-        let smooth_blend = (1.0 - (blend * std::f32::consts::PI).cos()) * 0.5;
+        let smooth_blend = cosine_blend(t / 0.2);
         (
             lerp_color(night_horizon, sunset_horizon, smooth_blend),
             lerp_color(night_zenith, sunset_zenith, smooth_blend),
         )
     } else if t < 0.3 {
         // Sunrise transition
-        let blend = (t - 0.2) / 0.1;
-        let smooth_blend = (1.0 - (blend * std::f32::consts::PI).cos()) * 0.5;
+        let smooth_blend = cosine_blend((t - 0.2) / 0.1);
         (
             lerp_color(sunset_horizon, day_horizon, smooth_blend),
             lerp_color(sunset_zenith, day_zenith, smooth_blend),
@@ -201,16 +201,14 @@ fn sky_colors(time_of_day: f32) -> ([f32; 4], [f32; 4]) {
         (day_horizon, day_zenith)
     } else if t < 0.8 {
         // Sunset transition
-        let blend = (t - 0.7) / 0.1;
-        let smooth_blend = (1.0 - (blend * std::f32::consts::PI).cos()) * 0.5;
+        let smooth_blend = cosine_blend((t - 0.7) / 0.1);
         (
             lerp_color(day_horizon, sunset_horizon, smooth_blend),
             lerp_color(day_zenith, sunset_zenith, smooth_blend),
         )
     } else {
         // Evening to night
-        let blend = (t - 0.8) / 0.2;
-        let smooth_blend = (1.0 - (blend * std::f32::consts::PI).cos()) * 0.5;
+        let smooth_blend = cosine_blend((t - 0.8) / 0.2);
         (
             lerp_color(sunset_horizon, night_horizon, smooth_blend),
             lerp_color(sunset_zenith, night_zenith, smooth_blend),

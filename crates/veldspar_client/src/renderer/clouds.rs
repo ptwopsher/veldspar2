@@ -17,6 +17,20 @@ struct CloudUniform {
     _pad2: [f32; 4],
 }
 
+impl CloudUniform {
+    fn new(camera_pos: [f32; 4], inv_view_proj: [[f32; 4]; 4], time: f32) -> Self {
+        Self {
+            camera_pos,
+            inv_view_proj,
+            time,
+            cloud_height: CLOUD_HEIGHT,
+            _pad: [0.0; 2],
+            _pad1: [0.0; 4],
+            _pad2: [0.0; 4],
+        }
+    }
+}
+
 pub struct CloudRenderer {
     pipeline: wgpu::RenderPipeline,
     uniform_buffer: wgpu::Buffer,
@@ -90,15 +104,8 @@ impl CloudRenderer {
             cache: None,
         });
 
-        let initial_uniform = CloudUniform {
-            camera_pos: [0.0, 0.0, 0.0, 0.0],
-            inv_view_proj: glam::Mat4::IDENTITY.to_cols_array_2d(),
-            time: 0.0,
-            cloud_height: CLOUD_HEIGHT,
-            _pad: [0.0, 0.0],
-            _pad1: [0.0; 4],
-            _pad2: [0.0; 4],
-        };
+        let initial_uniform =
+            CloudUniform::new([0.0; 4], glam::Mat4::IDENTITY.to_cols_array_2d(), 0.0);
 
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Cloud Uniform Buffer"),
@@ -123,15 +130,11 @@ impl CloudRenderer {
     }
 
     pub fn update(&self, queue: &wgpu::Queue, camera: &Camera, time: f32) {
-        let uniform = CloudUniform {
-            camera_pos: [camera.position.x, camera.position.y, camera.position.z, 1.0],
-            inv_view_proj: camera.view_projection_matrix().inverse().to_cols_array_2d(),
+        let uniform = CloudUniform::new(
+            [camera.position.x, camera.position.y, camera.position.z, 1.0],
+            camera.view_projection_matrix().inverse().to_cols_array_2d(),
             time,
-            cloud_height: CLOUD_HEIGHT,
-            _pad: [0.0, 0.0],
-            _pad1: [0.0; 4],
-            _pad2: [0.0; 4],
-        };
+        );
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniform));
     }
 
