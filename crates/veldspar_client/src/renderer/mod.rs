@@ -7,6 +7,7 @@ pub mod mesh;
 pub mod particles;
 pub mod pipeline;
 pub mod player_renderer;
+pub mod portal_renderer;
 pub mod sky;
 pub mod ui;
 pub mod water_pipeline;
@@ -29,12 +30,13 @@ use crate::renderer::atlas::{build_atlas, AtlasBuildError, AtlasMapping};
 use crate::renderer::chunk_renderer::{
     collect_visible_transparent_chunks,
     extract_frustum_planes,
-    render_chunks,
+    render_chunks_with_camera,
     render_visible_transparent_chunks,
     update_mesh_buffers,
     upload_mesh,
     ChunkPassStats,
     ChunkRenderData,
+    FrustumPlanes,
     MeshUploadStats,
 };
 use crate::renderer::clouds::CloudRenderer;
@@ -43,6 +45,7 @@ use crate::renderer::mesh::{ChunkMesh, ChunkMeshes};
 use crate::renderer::particles::ParticleRenderer;
 use crate::renderer::pipeline::ChunkPipeline;
 use crate::renderer::player_renderer::{MobRenderInfo, PlayerRenderer, RemotePlayer};
+use crate::renderer::portal_renderer::PortalRenderer;
 use crate::renderer::sky::{sky_horizon_color, SkyRenderer};
 use crate::renderer::water_pipeline::WaterPipeline;
 use crate::ui::block_highlight::BlockHighlightRenderer;
@@ -55,6 +58,9 @@ use crate::ui::text_overlay::TextOverlayRenderer;
 
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 const WEATHER_DARKEN_STRENGTH: f32 = 0.3;
+const MAIN_PASS_FRUSTUM_CULLING: bool = false;
+
+pub use crate::renderer::portal_renderer::{PortalRenderInfo, PortalRenderPortal};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
@@ -71,8 +77,9 @@ struct CameraUniform {
 }
 
 impl CameraUniform {
-    fn from_camera(
-        camera: &Camera,
+    fn from_view_projection(
+        view_proj: glam::Mat4,
+        camera_pos: glam::Vec3,
         fog_start: f32,
         fog_end: f32,
         time_of_day: f32,
@@ -87,8 +94,8 @@ impl CameraUniform {
         fog_color[2] *= weather_factor;
 
         Self {
-            view_proj: camera.view_projection_matrix().to_cols_array_2d(),
-            camera_pos: [camera.position.x, camera.position.y, camera.position.z, 0.0],
+            view_proj: view_proj.to_cols_array_2d(),
+            camera_pos: [camera_pos.x, camera_pos.y, camera_pos.z, 0.0],
             fog_color,
             fog_start,
             fog_end,
@@ -98,11 +105,34 @@ impl CameraUniform {
             _padding: [0.0; 3],
         }
     }
+
+    fn from_camera(
+        camera: &Camera,
+        fog_start: f32,
+        fog_end: f32,
+        time_of_day: f32,
+        underwater: bool,
+        render_time_seconds: f32,
+        weather_dim: f32,
+    ) -> Self {
+        Self::from_view_projection(
+            camera.view_projection_matrix(),
+            camera.position,
+            fog_start,
+            fog_end,
+            time_of_day,
+            underwater,
+            render_time_seconds,
+            weather_dim,
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RenderFrameStats {
     pub opaque_draw_calls: u32,
+    pub portal_draw_calls: u32,
+    pub portal_view_passes: u32,
     pub water_draw_calls: u32,
     pub rendered_chunks: u32,
     pub rendered_indices: u64,
@@ -139,6 +169,31 @@ impl DepthTexture {
     }
 }
 
+#[derive(Debug, Clone)]
+struct CachedCameraState {
+    camera: Camera,
+    fog_start: f32,
+    fog_end: f32,
+    time_of_day: f32,
+    underwater: bool,
+    render_time_seconds: f32,
+    weather_dim: f32,
+}
+
+impl Default for CachedCameraState {
+    fn default() -> Self {
+        Self {
+            camera: Camera::default(),
+            fog_start: 0.0,
+            fog_end: 1.0,
+            time_of_day: 0.5,
+            underwater: false,
+            render_time_seconds: 0.0,
+            weather_dim: 0.0,
+        }
+    }
+}
+
 pub struct Renderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -147,14 +202,19 @@ pub struct Renderer {
     depth_texture: DepthTexture,
     chunk_pipeline: ChunkPipeline,
     water_pipeline: WaterPipeline,
+    portal_renderer: PortalRenderer,
     camera_uniform_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
+    portal_camera_uniform_buffers: [wgpu::Buffer; 2],
+    portal_camera_bind_groups: [wgpu::BindGroup; 2],
     atlas_bind_group: wgpu::BindGroup,
     _atlas_texture: wgpu::Texture,
     atlas_mapping: AtlasMapping,
     chunk_meshes: FxHashMap<ChunkPos, ChunkRenderData>,
     water_meshes: FxHashMap<ChunkPos, ChunkRenderData>,
     visible_transparent: Vec<(ChunkPos, f32)>,
+    portal_visible_transparent: [Vec<(ChunkPos, f32)>; 2],
+    portal_render_info: PortalRenderInfo,
     sky_renderer: SkyRenderer,
     cloud_renderer: CloudRenderer,
     particle_renderer: ParticleRenderer,
@@ -167,6 +227,7 @@ pub struct Renderer {
     text_overlay_renderer: TextOverlayRenderer,
     player_renderer: PlayerRenderer,
     main_menu_renderer: MainMenuRenderer,
+    camera_state: CachedCameraState,
     view_proj: Cell<glam::Mat4>,
     camera_pos: Cell<glam::Vec3>,
     crosshair_visible: bool,
@@ -239,6 +300,11 @@ impl Renderer {
             &chunk_pipeline.texture_bind_group_layout,
             &chunk_pipeline.chunk_params_bind_group_layout,
         );
+        let mut portal_renderer = PortalRenderer::new(
+            &device,
+            surface_config.format,
+            &chunk_pipeline.camera_bind_group_layout,
+        );
         let atlas_dir =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../Excalibur_V1/assets/minecraft/textures/block");
         let (atlas_texture, atlas_view, atlas_sampler, atlas_mapping) =
@@ -275,6 +341,30 @@ impl Renderer {
                 resource: camera_uniform_buffer.as_entire_binding(),
             }],
         });
+        let portal_camera_uniform_buffers = std::array::from_fn(|index| {
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(match index {
+                    0 => "Portal Camera Uniform Buffer Orange",
+                    _ => "Portal Camera Uniform Buffer Blue",
+                }),
+                contents: bytemuck::bytes_of(&initial_camera_uniform),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            })
+        });
+        let portal_camera_bind_groups = std::array::from_fn(|index| {
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some(match index {
+                    0 => "Portal Camera Bind Group Orange",
+                    _ => "Portal Camera Bind Group Blue",
+                }),
+                layout: &chunk_pipeline.camera_bind_group_layout,
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: portal_camera_uniform_buffers[index].as_entire_binding(),
+                }],
+            })
+        });
+        portal_renderer.resize(&device, surface_config.width, surface_config.height);
         let depth_texture = DepthTexture::new(&device, surface_config.width, surface_config.height);
         let sky_renderer = SkyRenderer::new(&device, surface_config.format);
         let cloud_renderer = CloudRenderer::new(&device, surface_config.format);
@@ -354,14 +444,19 @@ impl Renderer {
             depth_texture,
             chunk_pipeline,
             water_pipeline,
+            portal_renderer,
             camera_uniform_buffer,
             camera_bind_group,
+            portal_camera_uniform_buffers,
+            portal_camera_bind_groups,
             atlas_bind_group,
             _atlas_texture: atlas_texture,
             atlas_mapping,
             chunk_meshes: FxHashMap::default(),
             water_meshes: FxHashMap::default(),
             visible_transparent: Vec::new(),
+            portal_visible_transparent: std::array::from_fn(|_| Vec::new()),
+            portal_render_info: PortalRenderInfo::default(),
             sky_renderer,
             cloud_renderer,
             particle_renderer,
@@ -374,6 +469,7 @@ impl Renderer {
             text_overlay_renderer,
             player_renderer,
             main_menu_renderer,
+            camera_state: CachedCameraState::default(),
             view_proj: Cell::new(glam::Mat4::IDENTITY),
             camera_pos: Cell::new(glam::Vec3::ZERO),
             crosshair_visible: true,
@@ -390,6 +486,7 @@ impl Renderer {
         self.surface_config.height = height;
         self.surface.configure(&self.device, &self.surface_config);
         self.depth_texture = DepthTexture::new(&self.device, width, height);
+        self.portal_renderer.resize(&self.device, width, height);
         self.crosshair_renderer.resize(&self.queue, width, height);
     }
 
@@ -399,6 +496,10 @@ impl Renderer {
 
     pub fn last_frame_stats(&self) -> RenderFrameStats {
         self.last_frame_stats
+    }
+
+    pub fn set_portal_render_info(&mut self, portal_render_info: PortalRenderInfo) {
+        self.portal_render_info = portal_render_info;
     }
 
     pub fn reserve_chunk_mesh_capacity(&mut self, loaded_chunks: usize) {
@@ -413,10 +514,15 @@ impl Renderer {
             self.visible_transparent
                 .reserve(target - self.visible_transparent.capacity());
         }
+        for visible in &mut self.portal_visible_transparent {
+            if visible.capacity() < target {
+                visible.reserve(target - visible.capacity());
+            }
+        }
     }
 
     pub fn update_camera_uniform(
-        &self,
+        &mut self,
         camera: &Camera,
         fog_start: f32,
         fog_end: f32,
@@ -440,6 +546,15 @@ impl Renderer {
         // Store view_proj and camera_pos for frustum culling
         self.view_proj.set(camera.view_projection_matrix());
         self.camera_pos.set(camera.position);
+        self.camera_state = CachedCameraState {
+            camera: camera.clone(),
+            fog_start,
+            fog_end,
+            time_of_day,
+            underwater,
+            render_time_seconds,
+            weather_dim,
+        };
     }
 
     pub fn update_sky(&self, camera: &Camera, time_of_day: f32, weather_dim: f32) {
@@ -500,6 +615,10 @@ impl Renderer {
     pub fn clear_chunk_meshes(&mut self) {
         self.chunk_meshes.clear();
         self.water_meshes.clear();
+        self.visible_transparent.clear();
+        for visible in &mut self.portal_visible_transparent {
+            visible.clear();
+        }
         self.particle_renderer.clear();
         self.item_drop_renderer.clear();
     }
@@ -767,6 +886,187 @@ impl Renderer {
         Ok(())
     }
 
+    fn render_portal_views(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        main_frustum: &FrustumPlanes,
+    ) -> u32 {
+        let camera_state = self.camera_state.clone();
+        let queue = &self.queue;
+        let sky_renderer = &self.sky_renderer;
+        let cloud_renderer = &self.cloud_renderer;
+        let chunk_pipeline = self.chunk_pipeline.pipeline();
+        let water_pipeline = self.water_pipeline.pipeline();
+        let atlas_bind_group = &self.atlas_bind_group;
+        let chunk_meshes = &self.chunk_meshes;
+        let water_meshes = &self.water_meshes;
+        let portal_camera_uniform_buffers = &self.portal_camera_uniform_buffers;
+        let portal_camera_bind_groups = &self.portal_camera_bind_groups;
+        let portal_visible_transparent = &mut self.portal_visible_transparent;
+
+        let rendered_passes = self.portal_renderer.render_portal_views(
+            &self.portal_render_info,
+            &camera_state.camera,
+            camera_state.camera.position,
+            main_frustum,
+            |source_index, portal_camera, color_view, depth_view| {
+                let uniform = CameraUniform::from_view_projection(
+                    portal_camera.view_proj,
+                    portal_camera.position,
+                    camera_state.fog_start,
+                    camera_state.fog_end,
+                    camera_state.time_of_day,
+                    camera_state.underwater,
+                    camera_state.render_time_seconds,
+                    camera_state.weather_dim,
+                );
+                queue.write_buffer(
+                    &portal_camera_uniform_buffers[source_index],
+                    0,
+                    bytemuck::bytes_of(&uniform),
+                );
+                let portal_camera_bind_group = &portal_camera_bind_groups[source_index];
+                let portal_frustum = extract_frustum_planes(portal_camera.view_proj);
+
+                collect_visible_transparent_chunks(
+                    water_meshes,
+                    &portal_frustum,
+                    portal_camera.position,
+                    &mut portal_visible_transparent[source_index],
+                    true,
+                );
+
+                let clear_color = sky_horizon_color(camera_state.time_of_day);
+                sky_renderer.update(
+                    queue,
+                    &portal_camera.camera,
+                    camera_state.time_of_day,
+                    camera_state.weather_dim,
+                );
+                {
+                    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("Portal RTT Sky Pass"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: color_view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color {
+                                    r: clear_color[0] as f64,
+                                    g: clear_color[1] as f64,
+                                    b: clear_color[2] as f64,
+                                    a: clear_color[3] as f64,
+                                }),
+                                store: wgpu::StoreOp::Store,
+                            },
+                        })],
+                        depth_stencil_attachment: None,
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
+                    });
+                    sky_renderer.render(&mut render_pass);
+                }
+
+                cloud_renderer.update(queue, &portal_camera.camera, camera_state.time_of_day);
+                {
+                    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("Portal RTT Cloud Pass"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: color_view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Load,
+                                store: wgpu::StoreOp::Store,
+                            },
+                        })],
+                        depth_stencil_attachment: None,
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
+                    });
+                    cloud_renderer.render(&mut render_pass);
+                }
+
+                {
+                    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("Portal RTT Opaque Pass"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: color_view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Load,
+                                store: wgpu::StoreOp::Store,
+                            },
+                        })],
+                        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                            view: depth_view,
+                            depth_ops: Some(wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(1.0),
+                                store: wgpu::StoreOp::Store,
+                            }),
+                            stencil_ops: None,
+                        }),
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
+                    });
+                    render_pass.set_pipeline(chunk_pipeline);
+                    render_pass.set_bind_group(1, atlas_bind_group, &[]);
+                    let _ = render_chunks_with_camera(
+                        &mut render_pass,
+                        chunk_meshes,
+                        &portal_frustum,
+                        true,
+                        portal_camera_bind_group,
+                    );
+                }
+
+                {
+                    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("Portal RTT Water Pass"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: color_view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Load,
+                                store: wgpu::StoreOp::Store,
+                            },
+                        })],
+                        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                            view: depth_view,
+                            depth_ops: Some(wgpu::Operations {
+                                load: wgpu::LoadOp::Load,
+                                store: wgpu::StoreOp::Store,
+                            }),
+                            stencil_ops: None,
+                        }),
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
+                    });
+                    render_pass.set_pipeline(water_pipeline);
+                    render_pass.set_bind_group(0, portal_camera_bind_group, &[]);
+                    render_pass.set_bind_group(1, atlas_bind_group, &[]);
+                    let _ = render_visible_transparent_chunks(
+                        &mut render_pass,
+                        water_meshes,
+                        &portal_visible_transparent[source_index],
+                    );
+                }
+            },
+        );
+
+        self.sky_renderer.update(
+            &self.queue,
+            &self.camera_state.camera,
+            self.camera_state.time_of_day,
+            self.camera_state.weather_dim,
+        );
+        self.cloud_renderer.update(
+            &self.queue,
+            &self.camera_state.camera,
+            self.camera_state.time_of_day,
+        );
+
+        rendered_passes
+    }
+
     pub fn render_frame(&mut self, draw_menu_overlay: bool) -> Result<(), wgpu::SurfaceError> {
         let frame = self.surface.get_current_texture()?;
         let view = frame
@@ -781,11 +1081,14 @@ impl Renderer {
                 label: Some("Veldspar Command Encoder"),
             });
 
+        frame_stats.portal_view_passes = self.render_portal_views(&mut encoder, &frustum_planes);
+
         collect_visible_transparent_chunks(
             &self.water_meshes,
             &frustum_planes,
             self.camera_pos.get(),
             &mut self.visible_transparent,
+            MAIN_PASS_FRUSTUM_CULLING,
         );
 
         {
@@ -852,10 +1155,21 @@ impl Renderer {
                 occlusion_query_set: None,
             });
             render_pass.set_pipeline(self.chunk_pipeline.pipeline());
-            render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
             render_pass.set_bind_group(1, &self.atlas_bind_group, &[]);
-            let chunk_stats = render_chunks(&mut render_pass, &self.chunk_meshes, &frustum_planes);
+            let chunk_stats = render_chunks_with_camera(
+                &mut render_pass,
+                &self.chunk_meshes,
+                &frustum_planes,
+                MAIN_PASS_FRUSTUM_CULLING,
+                &self.camera_bind_group,
+            );
             accumulate_chunk_stats(&mut frame_stats, chunk_stats, true);
+            frame_stats.portal_draw_calls += self.portal_renderer.render_portal_frames(
+                &self.queue,
+                &mut render_pass,
+                &self.camera_bind_group,
+                &self.portal_render_info,
+            );
 
             self.block_highlight.render(&mut render_pass, &self.camera_bind_group);
             self.break_indicator
@@ -865,6 +1179,36 @@ impl Renderer {
             self.player_renderer.render(&mut render_pass, &self.camera_bind_group);
             self.player_renderer
                 .render_mobs(&mut render_pass, &self.camera_bind_group);
+        }
+
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Veldspar Portal Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_texture.view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            frame_stats.portal_draw_calls += self.portal_renderer.render_portal_surfaces(
+                &self.queue,
+                &mut render_pass,
+                &self.camera_bind_group,
+                &self.portal_render_info,
+            );
         }
 
         {

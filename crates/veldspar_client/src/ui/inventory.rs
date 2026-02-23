@@ -251,6 +251,7 @@ pub fn build_creative_catalog(registry: &BlockRegistry) -> Vec<ItemId> {
     for id in FIRST_NON_BLOCK_ITEM_ID..=ItemId::BONE_MEAL.0 {
         items.push(ItemId(id));
     }
+    items.push(ItemId::PORTAL_GUN);
 
     items
 }
@@ -1693,6 +1694,10 @@ fn block_color_from_item(stack: ItemStack, registry: Option<&BlockRegistry>) -> 
 }
 
 pub fn item_display_name(item: ItemId, registry: Option<&BlockRegistry>) -> String {
+    if let Some(display_name) = item.display_name() {
+        return display_name.to_ascii_uppercase();
+    }
+
     match item {
         ItemId::STICK => "STICK".to_string(),
         ItemId::WOODEN_PICKAXE => "WOODEN PICKAXE".to_string(),

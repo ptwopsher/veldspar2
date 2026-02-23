@@ -81,6 +81,14 @@ impl ItemId {
     pub const GOLD_CHESTPLATE: Self = Self(Self::STICK.0 + 67);
     pub const GOLD_LEGGINGS: Self = Self(Self::STICK.0 + 68);
     pub const GOLD_BOOTS: Self = Self(Self::STICK.0 + 69);
+    pub const PORTAL_GUN: Self = Self(Self::STICK.0 + 70);
+
+    pub fn display_name(self) -> Option<&'static str> {
+        match self {
+            Self::PORTAL_GUN => Some("Portal Gun"),
+            _ => None,
+        }
+    }
 
     pub fn is_block(self) -> bool {
         self.0 < FIRST_NON_BLOCK_ITEM_ID
@@ -337,6 +345,9 @@ pub fn is_bucket(item: ItemId) -> bool {
 
 pub fn max_stack_for_item(item: ItemId) -> u8 {
     if item.is_tool() || item.is_armor() {
+        return 1;
+    }
+    if item == ItemId::PORTAL_GUN {
         return 1;
     }
     if item == ItemId::WATER_BUCKET || item == ItemId::LAVA_BUCKET {

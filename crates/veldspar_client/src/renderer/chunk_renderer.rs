@@ -9,7 +9,6 @@ use veldspar_shared::coords::ChunkPos;
 use crate::renderer::mesh::{ChunkMesh, ChunkVertex};
 
 pub type FrustumPlanes = [[f32; 4]; 6];
-const FRUSTUM_CULLING_ENABLED: bool = false;
 const CHUNK_WORLD_SIZE: f32 = 32.0;
 const CHUNK_HALF_EXTENT: f32 = CHUNK_WORLD_SIZE * 0.5;
 
@@ -152,13 +151,14 @@ pub fn render_chunks(
     pass: &mut wgpu::RenderPass<'_>,
     chunks: &FxHashMap<ChunkPos, ChunkRenderData>,
     frustum_planes: &FrustumPlanes,
+    frustum_culling_enabled: bool,
 ) -> ChunkPassStats {
     let mut stats = ChunkPassStats::default();
     for chunk in chunks.values() {
         if chunk.index_count == 0 {
             continue;
         }
-        if FRUSTUM_CULLING_ENABLED {
+        if frustum_culling_enabled {
             let chunk_world = chunk_center(chunk.chunk_pos);
             if !aabb_in_frustum(frustum_planes, chunk_world, CHUNK_HALF_EXTENT) {
                 continue;
@@ -169,11 +169,23 @@ pub fn render_chunks(
     stats
 }
 
+pub fn render_chunks_with_camera<'a>(
+    pass: &mut wgpu::RenderPass<'a>,
+    chunks: &'a FxHashMap<ChunkPos, ChunkRenderData>,
+    frustum_planes: &FrustumPlanes,
+    frustum_culling_enabled: bool,
+    camera_bind_group: &'a wgpu::BindGroup,
+) -> ChunkPassStats {
+    pass.set_bind_group(0, camera_bind_group, &[]);
+    render_chunks(pass, chunks, frustum_planes, frustum_culling_enabled)
+}
+
 pub fn collect_visible_transparent_chunks(
     chunks: &FxHashMap<ChunkPos, ChunkRenderData>,
     frustum_planes: &FrustumPlanes,
     camera_pos: Vec3,
     visible: &mut Vec<(ChunkPos, f32)>,
+    frustum_culling_enabled: bool,
 ) {
     visible.clear();
     visible.reserve(chunks.len().saturating_sub(visible.capacity()));
@@ -184,7 +196,7 @@ pub fn collect_visible_transparent_chunks(
         }
 
         let chunk_world = chunk_center(chunk.chunk_pos);
-        if FRUSTUM_CULLING_ENABLED {
+        if frustum_culling_enabled {
             if !aabb_in_frustum(frustum_planes, chunk_world, CHUNK_HALF_EXTENT) {
                 continue;
             }

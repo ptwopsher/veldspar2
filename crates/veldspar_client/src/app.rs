@@ -1,3 +1,6 @@
+#[path = "portal.rs"]
+pub mod portal;
+
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
 use std::hash::{Hash, Hasher};
@@ -39,13 +42,14 @@ use crate::persistence::{scan_worlds, ClientPersistence, SavedPlayMode, WorldMet
 use crate::renderer::item_drop_renderer::ItemDropRenderData;
 use crate::renderer::mesh::{ChunkMeshes, ChunkVertex};
 use crate::renderer::player_renderer::{MobRenderInfo, RemotePlayer};
-use crate::renderer::{RenderFrameStats, Renderer};
-use crate::ui::debug_overlay::DebugInfo;
+use crate::renderer::{PortalRenderInfo, PortalRenderPortal, RenderFrameStats, Renderer};
+use crate::ui::debug_overlay::{DebugInfo, PortalOverlayInfo};
 use crate::ui::inventory;
 use crate::ui::main_menu::{
     PauseMenuHitTarget, SettingsHitTarget, SettingsMenuView, SettingsSliderKind,
     WorldCreateInputField, WorldListEntryView, WorldSelectHitTarget, WorldSelectView,
 };
+use portal::*;
 use tracing::{debug, error, info, warn};
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, ElementState, MouseButton, WindowEvent};
@@ -542,6 +546,21 @@ struct MeshUploadBudget {
     max_chunks: usize,
 }
 
+struct AppPortalChunksAccessor<'a> {
+    chunks: &'a HashMap<ChunkPos, ChunkData>,
+    registry: &'a BlockRegistry,
+}
+
+impl PortalChunksAccessor for AppPortalChunksAccessor<'_> {
+    fn block_at(&self, pos: IVec3) -> Option<BlockId> {
+        block_at(pos, self.chunks)
+    }
+
+    fn is_block_solid(&self, pos: IVec3) -> bool {
+        is_block_solid(pos.x, pos.y, pos.z, self.chunks, self.registry)
+    }
+}
+
 struct ClientApp {
     window: Option<Arc<Window>>,
     renderer: Option<Renderer>,
@@ -588,7 +607,12 @@ struct ClientApp {
     last_inv_click_time: Instant,
     inv_click_count: u8,
     player_pos: Vec3,
+    prev_eye_pos: Vec3,
     velocity: Vec3,
+    portal_manager: PortalManager,
+    portal_gun: PortalGunState,
+    portal_teleport_count: u32,
+    last_portal_teleport_time_s: Option<f32>,
     on_ground: bool,
     fly_mode: bool,
     flight_stream_floor_y: Option<i32>,
@@ -734,7 +758,12 @@ impl Default for ClientApp {
             last_inv_click_time: Instant::now(),
             inv_click_count: 0,
             player_pos: Vec3::new(0.0, 40.0, 0.0),
+            prev_eye_pos: Vec3::new(0.0, 40.0 + EYE_HEIGHT, 0.0),
             velocity: Vec3::ZERO,
+            portal_manager: PortalManager::default(),
+            portal_gun: PortalGunState::default(),
+            portal_teleport_count: 0,
+            last_portal_teleport_time_s: None,
             on_ground: false,
             fly_mode: false,
             flight_stream_floor_y: None,
@@ -1029,6 +1058,77 @@ impl ClientApp {
             selected_block_from_inventory(&self.inventory, self.selected_hotbar_slot);
     }
 
+    fn held_item_is_portal_gun(&self) -> bool {
+        self.inventory
+            .get(self.selected_hotbar_slot)
+            .is_some_and(|stack| stack.count > 0 && stack.item == ItemId::PORTAL_GUN)
+    }
+
+    fn try_fire_portal_gun(&mut self, color: PortalColor) -> bool {
+        self.portal_gun.last_shot_time_s = self.render_time_seconds;
+
+        let Some(registry) = self.registry.as_ref() else {
+            return false;
+        };
+        let chunks_accessor = AppPortalChunksAccessor {
+            chunks: &self.chunks,
+            registry: registry.as_ref(),
+        };
+        let ray = Ray {
+            origin: self.camera.position,
+            direction: self.camera.forward_direction(),
+        };
+        for (block_pos, face) in raycast_blocks(&ray, 32.0) {
+            let Some(block) = block_at(block_pos, &self.chunks) else {
+                break;
+            };
+            if block == BlockId::AIR {
+                continue;
+            }
+            return self
+                .portal_manager
+                .place_portal(color, block_pos, face, &chunks_accessor);
+        }
+        false
+    }
+
+    fn portal_overlay_entry(&self, color: PortalColor) -> Option<PortalOverlayInfo> {
+        let portal = self.portal_manager.get_portal(color)?;
+        Some(PortalOverlayInfo {
+            support_lower: portal.support_lower,
+            face: portal.face,
+            linked: portal.linked_to.is_some(),
+        })
+    }
+
+    fn build_portal_render_info(&self) -> PortalRenderInfo {
+        let portals = std::array::from_fn(|index| {
+            self.portal_manager.portals[index]
+                .as_ref()
+                .map(|portal| {
+                    let mut frame_cells = [IVec3::ZERO; 10];
+                    for (dst, src) in frame_cells.iter_mut().zip(portal.frame_cells()) {
+                        *dst = src;
+                    }
+
+                    PortalRenderPortal {
+                        center: portal.center,
+                        normal: portal.normal.as_vec3(),
+                        up: portal.up.as_vec3(),
+                        right: portal.right.as_vec3(),
+                        half_extents: portal.half_extents,
+                        linked_to: portal.linked_to.map(|color| color.index()),
+                        frame_cells,
+                    }
+                })
+        });
+
+        PortalRenderInfo {
+            portals,
+            recursion_depth: 1,
+        }
+    }
+
     fn is_survival_mode(&self) -> bool {
         matches!(self.play_mode, PlayMode::Survival)
     }
@@ -1109,6 +1209,9 @@ impl ClientApp {
     fn rebuild_creative_catalog(&mut self) {
         if let Some(registry) = self.registry.as_deref() {
             self.creative_catalog_full = inventory::build_creative_catalog(registry);
+            if !self.creative_catalog_full.contains(&ItemId::PORTAL_GUN) {
+                self.creative_catalog_full.push(ItemId::PORTAL_GUN);
+            }
             self.filter_creative_catalog();
         } else {
             self.creative_catalog_full.clear();
@@ -2241,12 +2344,88 @@ impl ClientApp {
         self.player_pos = Vec3::new(x, y, z);
         self.velocity = Vec3::ZERO;
         self.camera.position = self.player_pos + Vec3::new(0.0, EYE_HEIGHT, 0.0);
+        self.prev_eye_pos = self.camera.position;
         if self.fly_mode {
             self.flight_stream_floor_y = Some(self.player_chunk_pos().y - self.settings.stream_flight_below);
         }
         self.last_player_chunk = None;
         self.chunks_ready = false;
         self.spawn_found = true;
+    }
+
+    fn resolve_post_teleport_collision_once(&mut self, registry: &BlockRegistry) {
+        if !collides_with_terrain(self.player_pos, &self.chunks, registry) {
+            return;
+        }
+
+        let offsets = [
+            Vec3::new(0.0, 0.08, 0.0),
+            Vec3::new(0.0, 0.2, 0.0),
+            Vec3::new(0.08, 0.0, 0.0),
+            Vec3::new(-0.08, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, 0.08),
+            Vec3::new(0.0, 0.0, -0.08),
+        ];
+        for offset in offsets {
+            let candidate = self.player_pos + offset;
+            if !collides_with_terrain(candidate, &self.chunks, registry) {
+                self.player_pos = candidate;
+                return;
+            }
+        }
+
+        let snapped = Vec3::new(
+            self.player_pos.x,
+            find_ground_snap(self.player_pos, &self.chunks, registry),
+            self.player_pos.z,
+        );
+        if !collides_with_terrain(snapped, &self.chunks, registry) {
+            self.player_pos = snapped;
+        }
+    }
+
+    fn try_apply_portal_teleport(&mut self) {
+        let eye_pos = self.player_pos + Vec3::new(0.0, EYE_HEIGHT, 0.0);
+        let pre_teleport_pos = self.player_pos;
+        let pre_teleport_vel = self.velocity;
+        let pre_teleport_yaw = self.camera.yaw;
+        let pre_teleport_pitch = self.camera.pitch;
+        self.portal_manager
+            .set_camera_forward(self.camera.forward_direction());
+
+        let Some(teleport) = self.portal_manager.check_and_teleport(
+            self.prev_eye_pos,
+            eye_pos,
+            self.velocity,
+            self.render_time_seconds,
+            &self.chunks,
+        ) else {
+            self.camera.position = eye_pos;
+            return;
+        };
+
+        self.camera.position = teleport.new_pos;
+        self.player_pos = teleport.new_pos - Vec3::new(0.0, EYE_HEIGHT, 0.0);
+        self.velocity = teleport.new_vel;
+        self.camera.yaw = teleport.new_yaw;
+        self.camera.pitch = teleport.new_pitch;
+
+        if let Some(registry) = self.registry.clone() {
+            self.resolve_post_teleport_collision_once(registry.as_ref());
+            if collides_with_terrain(self.player_pos, &self.chunks, registry.as_ref()) {
+                self.player_pos = pre_teleport_pos;
+                self.velocity = pre_teleport_vel;
+                self.camera.yaw = pre_teleport_yaw;
+                self.camera.pitch = pre_teleport_pitch;
+                self.camera.position = self.player_pos + Vec3::new(0.0, EYE_HEIGHT, 0.0);
+                return;
+            }
+        }
+
+        self.camera.position = self.player_pos + Vec3::new(0.0, EYE_HEIGHT, 0.0);
+        self.portal_teleport_count = self.portal_teleport_count.saturating_add(1);
+        self.last_portal_teleport_time_s = Some(self.render_time_seconds);
+        // TODO: screen flash on teleport
     }
 
     fn run_local_command(&mut self, raw: &str, target: CommandFeedbackTarget) {
@@ -2993,6 +3172,7 @@ impl ClientApp {
             "diamond_leggings" => Some(ItemId::DIAMOND_LEGGINGS),
             "diamond_boots" => Some(ItemId::DIAMOND_BOOTS),
             "bone_meal" | "bonemeal" => Some(ItemId::BONE_MEAL),
+            "portal_gun" | "portalgun" => Some(ItemId::PORTAL_GUN),
             _ => None,
         };
         if let Some(item_id) = explicit_item {
@@ -3069,6 +3249,11 @@ impl ClientApp {
                 self.chunks.len(),
                 self.pending_chunks.len(),
                 self.mesh_queue.len(),
+                self.portal_overlay_entry(PortalColor::Orange),
+                self.portal_overlay_entry(PortalColor::Blue),
+                self.portal_manager.get_linked_pair().is_some(),
+                self.portal_teleport_count,
+                self.last_portal_teleport_time_s,
                 mode,
                 connection_status,
                 self.last_render_stats,
@@ -3494,6 +3679,10 @@ impl ClientApp {
         self.world_seed = DEFAULT_WORLD_SEED;
         self.player_pos = Vec3::new(0.0, 40.0, 0.0);
         self.velocity = Vec3::ZERO;
+        self.portal_manager = PortalManager::default();
+        self.portal_gun = PortalGunState::default();
+        self.portal_teleport_count = 0;
+        self.last_portal_teleport_time_s = None;
         self.on_ground = false;
         self.camera.yaw = 0.0;
         self.camera.pitch = 0.0;
@@ -3563,6 +3752,7 @@ impl ClientApp {
             }
         };
         self.camera.position = self.player_pos + Vec3::new(0.0, EYE_HEIGHT, 0.0);
+        self.prev_eye_pos = self.camera.position;
         self.reset_weather_state();
         self.reset_growth_state();
 
@@ -3656,6 +3846,11 @@ impl ClientApp {
         self.last_player_chunk = None;
         self.player_pos = Vec3::new(0.0, 40.0, 0.0);
         self.velocity = Vec3::ZERO;
+        self.portal_manager = PortalManager::default();
+        self.portal_gun = PortalGunState::default();
+        self.portal_teleport_count = 0;
+        self.last_portal_teleport_time_s = None;
+        self.prev_eye_pos = self.player_pos + Vec3::new(0.0, EYE_HEIGHT, 0.0);
         self.on_ground = false;
         self.health = MAX_HEALTH;
         self.hunger = MAX_HUNGER;
@@ -3741,6 +3936,10 @@ impl ClientApp {
         self.pending_mesh_uploads.clear();
         self.last_upload_stats = UploadFrameStats::default();
         self.last_render_stats = RenderFrameStats::default();
+        self.portal_manager = PortalManager::default();
+        self.portal_gun = PortalGunState::default();
+        self.portal_teleport_count = 0;
+        self.last_portal_teleport_time_s = None;
         self.close_open_chest_ui();
         self.chest_inventories.clear();
         self.armor_slots = [None; 4];
@@ -3769,6 +3968,7 @@ impl ClientApp {
         self.button_timers.clear();
         self.active_pressure_plates.clear();
         self.block_scan_state = BlockScanState::default();
+        self.prev_eye_pos = self.player_pos + Vec3::new(0.0, EYE_HEIGHT, 0.0);
         if let Some(renderer) = self.renderer.as_mut() {
             renderer.clear_chunk_meshes();
         }
@@ -4246,6 +4446,8 @@ impl ClientApp {
         self.air_supply = MAX_AIR_SUPPLY;
         self.fall_start_y = None;
         self.damage_flash_timer = 0.0;
+        self.camera.position = self.player_pos + Vec3::new(0.0, EYE_HEIGHT, 0.0);
+        self.prev_eye_pos = self.camera.position;
     }
 
     fn take_chest_inventory_contents(&mut self, chest_pos: IVec3) -> Vec<ItemStack> {
@@ -6372,6 +6574,16 @@ impl ClientApp {
         previous_block: BlockId,
         next_block: BlockId,
     ) {
+        if let Some(registry) = self.registry.as_ref() {
+            let chunks_accessor = AppPortalChunksAccessor {
+                chunks: &self.chunks,
+                registry: registry.as_ref(),
+            };
+            self.portal_manager.invalidate_for_block_change(
+                chunk_to_world(chunk_pos, local_pos),
+                &chunks_accessor,
+            );
+        }
         let force_neighbor_light_update = self.registry.as_ref().is_some_and(|registry| {
             let previous_light = registry.get_properties(previous_block).light_level;
             let next_light = registry.get_properties(next_block).light_level;
@@ -6801,6 +7013,8 @@ impl ClientApp {
             }
         }
 
+        self.prev_eye_pos = self.player_pos + Vec3::new(0.0, EYE_HEIGHT, 0.0);
+
         let gameplay_input_blocked = self.console_open
             || self.chat_open
             || self.inventory_open
@@ -6994,7 +7208,7 @@ impl ClientApp {
             };
             self.camera.fov += (target_fov - self.camera.fov) * (dt * 8.0).min(1.0);
 
-            self.camera.position = self.player_pos + Vec3::new(0.0, EYE_HEIGHT, 0.0);
+            self.try_apply_portal_teleport();
             underwater = is_block_water(
                 self.camera.position.x as i32,
                 self.camera.position.y as i32,
@@ -7146,8 +7360,19 @@ impl ClientApp {
                 }
             }
 
+            let holding_portal_gun = self.held_item_is_portal_gun();
             let left_click_just_pressed = self.input.left_click && !self.was_left_click_down;
-            if left_click_just_pressed {
+            let mut consumed_portal_left_click = false;
+            if holding_portal_gun && left_click_just_pressed {
+                self.attack_animation = 1.0;
+                let primary_color = self.portal_gun.mode;
+                if self.try_fire_portal_gun(primary_color) {
+                    // TODO: play portal_place sound
+                }
+                consumed_portal_left_click = true;
+            }
+
+            if !consumed_portal_left_click && left_click_just_pressed {
                 self.attack_animation = 1.0;
                 if self.targeted_block.is_none() {
                     let _ = self.try_attack_mob_in_front();
@@ -7155,7 +7380,10 @@ impl ClientApp {
             }
 
             // Handle block breaking
-            if matches!(self.play_mode, PlayMode::Creative) {
+            if holding_portal_gun {
+                self.break_progress = 0.0;
+                self.breaking_block = None;
+            } else if matches!(self.play_mode, PlayMode::Creative) {
                 self.break_progress = 0.0;
                 self.breaking_block = None;
                 if left_click_just_pressed {
@@ -7208,7 +7436,15 @@ impl ClientApp {
             }
 
             // Handle block placement
-            if self.input.consume_right_click() {
+            if holding_portal_gun {
+                if self.input.consume_right_click() {
+                    self.attack_animation = 1.0;
+                    let secondary_color = self.portal_gun.mode.other();
+                    if self.try_fire_portal_gun(secondary_color) {
+                        // TODO: play portal_place sound
+                    }
+                }
+            } else if self.input.consume_right_click() {
                 self.attack_animation = 1.0;
                 let registry = self.registry.clone();
                 let mut block_edits_to_send: Vec<(IVec3, BlockId)> = Vec::new();
@@ -7650,7 +7886,7 @@ impl ClientApp {
             self.break_progress = 0.0;
             self.breaking_block = None;
             self.targeted_block = None;
-            self.camera.position = self.player_pos + Vec3::new(0.0, EYE_HEIGHT, 0.0);
+            self.try_apply_portal_teleport();
             underwater = is_block_water(
                 self.camera.position.x as i32,
                 self.camera.position.y as i32,
@@ -7768,6 +8004,11 @@ impl ClientApp {
                 self.chunks.len(),
                 self.pending_chunks.len(),
                 self.mesh_queue.len(),
+                self.portal_overlay_entry(PortalColor::Orange),
+                self.portal_overlay_entry(PortalColor::Blue),
+                self.portal_manager.get_linked_pair().is_some(),
+                self.portal_teleport_count,
+                self.last_portal_teleport_time_s,
                 mode,
                 connection_status,
                 self.last_render_stats,
@@ -7839,6 +8080,7 @@ impl ClientApp {
         );
         let xp_progress = self.xp_progress();
         let xp_level = self.xp_level;
+        let portal_render_info = self.build_portal_render_info();
         let Some(renderer) = self.renderer.as_mut() else {
             return;
         };
@@ -7853,6 +8095,7 @@ impl ClientApp {
             self.render_time_seconds,
             weather_dim,
         );
+        renderer.set_portal_render_info(portal_render_info);
         renderer.update_sky(&self.camera, self.time_of_day, weather_dim);
         renderer.update_clouds(&self.camera, self.time_of_day);
         if !rain_spawn_positions.is_empty() {
@@ -7918,6 +8161,12 @@ impl ClientApp {
         {
             hand_item = ItemId::from(self.selected_block);
         }
+        if hand_item == ItemId::PORTAL_GUN
+            && renderer.atlas_mapping().offset_for_item(ItemId::PORTAL_GUN).is_none()
+        {
+            // Temporary fallback until a dedicated portal gun texture slot is added.
+            hand_item = ItemId::FLINT_AND_STEEL;
+        }
         renderer.update_first_person_hand_item(hand_item);
         renderer.update_first_person_hand(
             self.camera.position,
@@ -7982,7 +8231,7 @@ impl ApplicationHandler for ClientApp {
             Ok(window) => {
                 let window = Arc::new(window);
                 match Renderer::new(window.clone()) {
-                    Ok(renderer) => {
+                    Ok(mut renderer) => {
                         let size = window.inner_size();
                         if size.width > 0 && size.height > 0 {
                             self.camera.aspect = size.width as f32 / size.height as f32;
@@ -7990,6 +8239,7 @@ impl ApplicationHandler for ClientApp {
                         self.player_pos = Vec3::new(0.0, 40.0, 0.0);
                         self.camera.position =
                             self.player_pos + Vec3::new(0.0, EYE_HEIGHT, 0.0);
+                        self.prev_eye_pos = self.camera.position;
                         renderer.update_camera_uniform(
                             &self.camera,
                             FOG_START,
@@ -8376,6 +8626,9 @@ impl ApplicationHandler for ClientApp {
                         }
                         if code == KeyCode::KeyR && !event.repeat {
                             self.sprinting = !self.sprinting;
+                        }
+                        if code == KeyCode::KeyQ && !event.repeat && self.held_item_is_portal_gun() {
+                            self.portal_gun.mode = self.portal_gun.mode.other();
                         }
 
                         // C key: toggle creative/survival
